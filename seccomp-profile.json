@@ -54,7 +54,19 @@
         "memfd_create", "copy_file_range",
         "statx", "close_range", "openat2",
         "rseq", "clone3",
-        "newfstatat", "statfs", "fstatfs"
+        "newfstatat", "statfs", "fstatfs",
+
+        "membarrier", "sigaltstack", "gettid", "restart_syscall",
+        "pkey_alloc", "pkey_free", "pkey_mprotect",
+        "mlock", "mlock2", "munlock",
+        "capget",
+        "rt_sigpending", "rt_sigsuspend", "rt_sigtimedwait",
+        "getcpu", "sched_get_priority_max", "sched_get_priority_min",
+        "getpriority", "setpriority",
+        "preadv", "pwritev", "fallocate", "fadvise64",
+        "splice", "tee", "sendmmsg", "recvmmsg", "shutdown",
+        "epoll_pwait2", "sync", "syncfs",
+        "setrlimit", "utimensat"
       ],
       "action": "SCMP_ACT_ALLOW"
     },
