@@ -16,11 +16,12 @@ RUN curl -fsSL "https://github.com/anomalyco/opencode/releases/download/${OPENCO
 
 # Install nanobot from submodule
 COPY nanobot/ /opt/nanobot/
-RUN pip install --no-cache-dir /opt/nanobot/
+RUN pip install --no-cache-dir /opt/nanobot/ gradio
 
-# Install protoClaw providers (patches on top of nanobot)
+# Install protoClaw providers and server
 COPY providers/ /opt/protoclaw/providers/
 COPY scripts/install-providers.py /opt/protoclaw/
+COPY server.py /opt/protoclaw/server.py
 RUN python /opt/protoclaw/install-providers.py
 
 # Sandbox workspace
@@ -39,4 +40,5 @@ RUN mkdir -p /home/sandbox/.config/opencode \
 USER sandbox
 WORKDIR /sandbox
 
-CMD ["nanobot", "agent"]
+EXPOSE 7865
+CMD ["python", "/opt/protoclaw/server.py", "--config", "/home/sandbox/.nanobot/config.json"]

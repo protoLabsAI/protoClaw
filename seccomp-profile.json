@@ -21,7 +21,7 @@
         "getitimer", "alarm", "setitimer",
         "getpid", "getppid", "getuid", "geteuid", "getgid", "getegid",
         "getgroups", "getresuid", "getresgid",
-        "sendfile", "socket", "connect", "accept",
+        "sendfile", "socket", "connect", "accept", "accept4",
         "sendto", "recvfrom", "sendmsg", "recvmsg",
         "bind", "listen", "getsockname", "getpeername",
         "socketpair", "setsockopt", "getsockopt",

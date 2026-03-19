@@ -26,6 +26,10 @@ services:
       - ./config/nanobot-config.json:/home/sandbox/.nanobot/config.json:ro
       - ./config/opencode.json:/home/sandbox/.config/opencode/opencode.json:ro
 
+    # Expose Gradio UI
+    ports:
+      - "7865:7865"
+
     # Network: host vLLM access
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -45,4 +49,4 @@ services:
     stdin_open: true
     tty: true
 
-    command: ["nanobot", "agent"]
+    command: ["python", "/opt/protoclaw/server.py", "--config", "/home/sandbox/.nanobot/config.json"]
