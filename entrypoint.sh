@@ -8,6 +8,10 @@ mkdir -p /home/sandbox/.nanobot /home/sandbox/.config/opencode /home/sandbox/.lo
 cp /opt/protoclaw/config/nanobot-config.json /home/sandbox/.nanobot/config.json
 cp /opt/protoclaw/config/opencode.json /home/sandbox/.config/opencode/opencode.json
 
+# Copy persona into workspace (nanobot reads SOUL.md from workspace)
+mkdir -p /sandbox
+cp /opt/protoclaw/config/SOUL.md /sandbox/SOUL.md
+
 # Start OpenCode web UI in background on port 7866
 opencode web --port 7866 --hostname 0.0.0.0 &
 

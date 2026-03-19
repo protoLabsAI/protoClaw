@@ -156,22 +156,26 @@ def create_app() -> gr.Blocks:
     with gr.Blocks(title="protoClaw") as app:
         session_id = gr.State("default")
 
-        gr.Markdown(f"## 🦀 protoClaw\n`{model_name}` · sandboxed agent")
+        gr.Markdown(f"### 🦀 protoClaw\n<sub>`{model_name}` · sandboxed agent</sub>")
 
-        chatbot = gr.Chatbot(height="75vh")
+        chatbot = gr.Chatbot(
+            height="80vh",
+            label="protoClaw",
+            show_label=False,
+        )
 
         with gr.Row():
             txt = gr.Textbox(
-                placeholder="Ask the agent anything...",
+                placeholder="Ask protoClaw anything...",
                 show_label=False,
                 scale=9,
                 container=False,
             )
-            send_btn = gr.Button("Send", variant="primary", scale=1)
+            send_btn = gr.Button("Send", variant="primary", scale=1, min_width=80)
 
         with gr.Row():
-            clear_btn = gr.Button("Clear Chat", size="sm")
-            new_session_btn = gr.Button("New Session", size="sm")
+            clear_btn = gr.Button("Clear", size="sm", variant="secondary")
+            new_session_btn = gr.Button("New Session", size="sm", variant="secondary")
 
         # --- Callbacks ---
 
@@ -222,5 +226,23 @@ if __name__ == "__main__":
         server_port=args.port,
         share=args.share,
         theme=gr.themes.Soft(primary_hue="blue", neutral_hue="slate"),
-        css=".chatbot { min-height: 70vh !important; } footer { display: none !important; }",
+        css="""
+            footer { display: none !important; }
+            .built-with { display: none !important; }
+            button.copy-btn, button.like, button.dislike,
+            .message-buttons-left, .message-buttons-right,
+            .bot .message-buttons, .user .message-buttons,
+            .copy-button, .action-button,
+            [data-testid="copy-button"], [data-testid="like"], [data-testid="dislike"],
+            .message-wrap .icon-button, .message-wrap .icon-buttons,
+            .chatbot .icon-button, .chatbot .icon-buttons,
+            .chatbot .action-buttons,
+            .chatbot button[aria-label="Copy"], .chatbot button[aria-label="Like"],
+            .chatbot button[aria-label="Dislike"], .chatbot button[aria-label="Retry"],
+            .badge-wrap, .chatbot .badge-wrap,
+            span.chatbot-badge, .chatbot-badge,
+            .built-with-gradio, a[href*="gradio.app"] {
+                display: none !important;
+            }
+        """,
     )
