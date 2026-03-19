@@ -42,20 +42,29 @@ _FRIENDS: list[Friend] = [
     Friend(
         name="claude-opus",
         provider="claude",
-        model="claude-opus-4-5-20250514",
+        model="claude-opus-4-6",
         intelligence="expert",
         cost="paid (rate-limited)",
-        skills="Deep reasoning, architecture, complex code review, planning",
+        skills="Most capable — deep reasoning, architecture, complex code review, planning",
         speed="slow",
     ),
     Friend(
         name="claude-sonnet",
         provider="claude",
-        model="claude-sonnet-4-5-20250514",
+        model="claude-sonnet-4-6",
         intelligence="expert",
         cost="paid (rate-limited)",
-        skills="Strong all-rounder, code generation, analysis, fast for its tier",
+        skills="Balanced performance and speed, code generation, analysis",
         speed="medium",
+    ),
+    Friend(
+        name="claude-haiku",
+        provider="claude",
+        model="claude-haiku-4-5-20251001",
+        intelligence="strong",
+        cost="paid (cheapest)",
+        skills="Fast and cost-efficient, good for simple reasoning tasks",
+        speed="fast",
     ),
     # OpenCode free models (no auth, good for quick reasoning)
     Friend(
@@ -131,13 +140,21 @@ def _get_ollama_friends() -> list[Friend]:
 _TIMEOUT = 120  # seconds
 
 
+_CLAUDE_MODEL_MAP = {
+    "claude-opus-4-6": "opus",
+    "claude-sonnet-4-6": "sonnet",
+    "claude-haiku-4-5-20251001": "haiku",
+}
+
+
 async def _call_claude(model: str, prompt: str) -> str:
     """Call Claude via CLI."""
+    cli_model = _CLAUDE_MODEL_MAP.get(model, "sonnet")
     cmd = [
         "claude", "-p", prompt,
         "--output-format", "json",
         "--max-turns", "3",
-        "--model", model.replace("claude-", ""),
+        "--model", cli_model,
         "--dangerously-skip-permissions",
     ]
     proc = await asyncio.create_subprocess_exec(

@@ -43,7 +43,7 @@ fi
 
 # Configure summarize CLI to use Anthropic by default
 mkdir -p /home/sandbox/.summarize
-echo '{"model": "anthropic/claude-sonnet-4-5-20250514"}' > /home/sandbox/.summarize/config.json
+echo '{"model": "anthropic/claude-sonnet-4-6"}' > /home/sandbox/.summarize/config.json
 
 # Start OpenCode web UI in background on port 7866
 opencode web --port 7866 --hostname 0.0.0.0 &

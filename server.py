@@ -605,8 +605,8 @@ def _build_settings_callbacks() -> dict:
         import os
         if os.environ.get("ANTHROPIC_API_KEY"):
             choices.extend([
-                "claude: claude-sonnet-4-5-20250514",
-                "claude: claude-opus-4-5-20250514",
+                "claude: claude-sonnet-4-6",
+                "claude: claude-opus-4-6",
                 "claude: claude-haiku-4-5-20251001",
             ])
         return choices
