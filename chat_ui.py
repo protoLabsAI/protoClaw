@@ -20,9 +20,7 @@ Usage:
 """
 
 import asyncio
-import queue
 import secrets
-import threading
 from typing import Callable, Awaitable, Any
 
 import gradio as gr
@@ -51,8 +49,6 @@ CLEAN_CSS = """
 
 # Type for chat functions: (message, session_id) -> list of message dicts
 ChatFn = Callable[[str, str], Awaitable[list[dict]]]
-# Type for streaming chat: (message, session_id, queue) -> None (pushes to queue)
-StreamingChatFn = Callable[..., None]
 
 # Type for settings callbacks
 SettingsCallbacks = dict[str, Any]
@@ -60,7 +56,6 @@ SettingsCallbacks = dict[str, Any]
 
 def create_chat_app(
     chat_fn: ChatFn,
-    streaming_fn: StreamingChatFn | None = None,
     title: str = "Chat",
     subtitle: str = "",
     placeholder: str = "Type a message...",
@@ -225,71 +220,26 @@ def create_chat_app(
                 history.append({"role": "user", "content": message})
                 return "", history, message
 
-            _SENTINEL = object()
-
             def get_response(history: list[dict], original_msg: str, sid: str):
-                """Call LLM, yielding progress updates as they arrive."""
+                """Call LLM and append response."""
                 if not original_msg.strip():
-                    yield history, sid
-                    return
-
-                # Handle slash commands synchronously
-                stripped = original_msg.strip()
-                if stripped.startswith("/"):
-                    result = asyncio.run(chat_fn(original_msg, sid))
-                    for msg in result:
-                        meta = msg.get("metadata", {})
-                        if meta.get("_clear"):
-                            yield [], sid
-                            return
-                        if meta.get("_new"):
-                            yield [], secrets.token_hex(4)
-                            return
-                    history.extend(result)
-                    yield history, sid
-                    return
-
-                # Streaming: run agent in thread, yield progress from queue
-                if streaming_fn is None:
-                    # Fallback to non-streaming
-                    result = asyncio.run(chat_fn(original_msg, sid))
-                    history.extend(result)
-                    yield history, sid
-                    return
-
-                q = queue.Queue()
-                thread = threading.Thread(
-                    target=streaming_fn,
-                    args=(original_msg, sid, q),
-                    daemon=True,
-                )
-                thread.start()
-
-                while True:
-                    try:
-                        msg = q.get(timeout=0.2)
-                    except queue.Empty:
-                        continue
-                    if msg is _SENTINEL:
-                        break
-                    # Check for sentinels (from slash commands routed through agent)
-                    meta = msg.get("metadata", {}) if isinstance(msg, dict) else {}
+                    return history, sid
+                result = asyncio.run(chat_fn(original_msg, sid))
+                # Handle command sentinels
+                for msg in result:
+                    meta = msg.get("metadata", {})
                     if meta.get("_clear"):
-                        yield [], sid
-                        return
+                        return [], sid
                     if meta.get("_new"):
-                        yield [], secrets.token_hex(4)
-                        return
-                    history.append(msg)
-                    yield history, sid
-
-                thread.join(timeout=5)
+                        return [], secrets.token_hex(4)
+                history.extend(result)
+                return history, sid
 
             # Hidden state to pass the original message between steps
             pending_msg = gr.State("")
 
             # Step 1: render user message instantly
-            # Step 2: stream LLM response with progress updates
+            # Step 2: call LLM (with loading indicator)
             for trigger in [txt.submit, send_btn.click]:
                 trigger(
                     fn=add_user_message,
