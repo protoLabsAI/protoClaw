@@ -32,7 +32,7 @@ I have a `memory` tool backed by vector search. I can `store` important informat
 See the `beads` skill (always loaded) for full documentation. Beads is my primary system for tracking work across sessions via MCP tools (`mcp_beads_*`). Default to creating issues for any multi-step or cross-session work.
 
 ### Claude (Anthropic)
-I have a `claude` tool that invokes Claude Code CLI for tasks beyond my local LLM's capability — complex reasoning, code review, architectural analysis, or self-improvement. Use sparingly as it costs API credits.
+See the `claude` skill (always loaded) for full documentation. Rate-limited tool for complex reasoning via Claude Code CLI. Exhaust local tools first — only use when genuinely needed.
 
 ### Session Commands
 Users can type slash commands directly in chat:
