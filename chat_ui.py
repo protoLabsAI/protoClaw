@@ -91,35 +91,32 @@ def create_chat_app(
             if subtitle:
                 header += f" &nbsp; {subtitle}"
 
+            gr.Markdown(header)
+
+            chatbot = gr.Chatbot(
+                height=chat_height,
+                show_label=False,
+            )
+
             with gr.Row():
-                with gr.Column(scale=4 if settings else 1):
-                    gr.Markdown(header)
+                txt = gr.Textbox(
+                    placeholder=placeholder,
+                    show_label=False,
+                    scale=9,
+                    container=False,
+                )
+                send_btn = gr.Button("Send", variant="primary", scale=1, min_width=80)
 
-                    chatbot = gr.Chatbot(
-                        height=chat_height,
-                        show_label=False,
-                    )
+            with gr.Row():
+                clear_btn = gr.Button("Clear", size="sm", variant="secondary")
+                new_btn = gr.Button("New Session", size="sm", variant="secondary")
 
-                    with gr.Row():
-                        txt = gr.Textbox(
-                            placeholder=placeholder,
-                            show_label=False,
-                            scale=9,
-                            container=False,
-                        )
-                        send_btn = gr.Button("Send", variant="primary", scale=1, min_width=80)
+            if footer_html:
+                gr.HTML(footer_html)
 
-                    with gr.Row():
-                        clear_btn = gr.Button("Clear", size="sm", variant="secondary")
-                        new_btn = gr.Button("New Session", size="sm", variant="secondary")
-
-                    if footer_html:
-                        gr.HTML(footer_html)
-
-                # --- Settings sidebar ---
-                if settings:
-                    with gr.Column(scale=1, min_width=320):
-                        gr.Markdown("**Settings**")
+            # --- Settings drawer ---
+            if settings:
+                with gr.Sidebar(label="Settings", open=False):
 
                         with gr.Accordion("MCP Servers", open=False):
                             mcp_status = gr.Markdown("Loading...")
