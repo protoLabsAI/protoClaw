@@ -4,6 +4,9 @@
 # Create dirs inside tmpfs home (tmpfs wipes everything)
 mkdir -p /home/sandbox/.nanobot /home/sandbox/.config/opencode /home/sandbox/.local
 
+# Ensure persistent volume dirs exist with correct ownership
+mkdir -p /sandbox/audit /sandbox/memory
+
 # Copy configs from mounted read-only location
 cp /opt/protoclaw/config/nanobot-config.json /home/sandbox/.nanobot/config.json
 cp /opt/protoclaw/config/opencode.json /home/sandbox/.config/opencode/opencode.json

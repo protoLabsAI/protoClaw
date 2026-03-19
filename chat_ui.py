@@ -106,16 +106,23 @@ def create_chat_app(
 
             def respond(message: str, history: list[dict], sid: str):
                 if not message.strip():
-                    return "", history
+                    return "", history, sid
                 history.append({"role": "user", "content": message})
                 result = asyncio.run(chat_fn(message, sid))
+                # Handle command sentinels
+                for msg in result:
+                    meta = msg.get("metadata", {})
+                    if meta.get("_clear"):
+                        return "", [], sid
+                    if meta.get("_new"):
+                        return "", [], secrets.token_hex(4)
                 history.extend(result)
-                return "", history
+                return "", history, sid
 
             submit_args = dict(
                 fn=respond,
                 inputs=[txt, chatbot, session_id],
-                outputs=[txt, chatbot],
+                outputs=[txt, chatbot, session_id],
             )
             txt.submit(**submit_args)
             send_btn.click(**submit_args)

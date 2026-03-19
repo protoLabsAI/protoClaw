@@ -14,21 +14,29 @@ RUN curl -fsSL "https://github.com/anomalyco/opencode/releases/download/${OPENCO
     | tar xz -C /usr/local/bin \
     && chmod +x /usr/local/bin/opencode
 
+# Browser tool: Node.js + agent-browser + Chromium
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    nodejs npm \
+    && rm -rf /var/lib/apt/lists/*
+RUN npm install -g agent-browser && agent-browser install --with-deps
+
 # Install nanobot from submodule
 COPY nanobot/ /opt/nanobot/
-RUN pip install --no-cache-dir /opt/nanobot/ gradio
+RUN pip install --no-cache-dir /opt/nanobot/ gradio sqlite-vec httpx
 
-# Install protoClaw providers and server
+# Install protoClaw providers, tools, and server
 COPY providers/ /opt/protoclaw/providers/
+COPY tools/ /opt/protoclaw/tools/
 COPY scripts/install-providers.py /opt/protoclaw/
+COPY audit.py /opt/protoclaw/audit.py
 COPY chat_ui.py /opt/protoclaw/chat_ui.py
 COPY server.py /opt/protoclaw/server.py
 COPY entrypoint.sh /opt/protoclaw/entrypoint.sh
 COPY config/ /opt/protoclaw/config/
 RUN python /opt/protoclaw/install-providers.py
 
-# Sandbox workspace
-RUN mkdir -p /sandbox /tmp/sandbox \
+# Sandbox workspace + audit/memory dirs
+RUN mkdir -p /sandbox /tmp/sandbox /sandbox/audit /sandbox/memory \
     && chown -R sandbox:sandbox /sandbox /tmp/sandbox
 
 # Nanobot data dir

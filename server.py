@@ -8,7 +8,9 @@ Usage:
 """
 
 import argparse
+import contextvars
 import re
+import time
 from pathlib import Path
 from typing import Any
 
@@ -114,6 +116,134 @@ def _make_provider(config):
 
 
 # ---------------------------------------------------------------------------
+# Session commands
+# ---------------------------------------------------------------------------
+
+_HELP_TEXT = """\
+**protoClaw commands:**
+| Command | Description |
+|---------|-------------|
+| `/new` | Clear chat history + nanobot session |
+| `/clear` | Clear chat display (session preserved) |
+| `/think <level>` | Set reasoning effort (low/medium/high/off) |
+| `/compact` | Force memory consolidation |
+| `/model` | Show current model |
+| `/tools` | List registered tools |
+| `/audit [n]` | Show recent audit log entries |
+| `/help` | Show this help |
+"""
+
+_THINK_LEVELS = {"low", "medium", "high", "off"}
+
+
+def _msg(content: str) -> list[dict[str, Any]]:
+    """Wrap a string as a single assistant message list."""
+    return [{"role": "assistant", "content": content}]
+
+
+async def _handle_command(cmd: str, args: str, session_id: str) -> list[dict[str, Any]] | None:
+    """Handle a slash command. Returns message list, or None if not a command."""
+    if cmd == "help":
+        return _msg(_HELP_TEXT)
+
+    if cmd == "clear":
+        return [{"role": "assistant", "content": "", "metadata": {"_clear": True}}]
+
+    if cmd == "new":
+        session_key = f"gradio:{session_id}"
+        session = _agent.sessions.get_or_create(session_key)
+        session.clear()
+        _agent.sessions.save(session)
+        return [{"role": "assistant", "content": "", "metadata": {"_new": True}}]
+
+    if cmd == "model":
+        return _msg(f"**Model:** `{_agent.model}`")
+
+    if cmd == "tools":
+        names = _agent.tools.tool_names
+        listing = "\n".join(f"- `{n}`" for n in sorted(names))
+        return _msg(f"**Registered tools ({len(names)}):**\n{listing}")
+
+    if cmd == "think":
+        level = args.strip().lower()
+        if level not in _THINK_LEVELS:
+            return _msg(f"Invalid level. Use one of: {', '.join(sorted(_THINK_LEVELS))}")
+        val = None if level == "off" else level
+        _agent.provider.generation.reasoning_effort = val
+        return _msg(f"Reasoning effort set to **{level}**.")
+
+    if cmd == "compact":
+        session_key = f"gradio:{session_id}"
+        session = _agent.sessions.get_or_create(session_key)
+        await _agent.memory_consolidator.maybe_consolidate_by_tokens(session)
+        return _msg("Memory consolidation complete.")
+
+    if cmd == "audit":
+        from audit import audit_logger
+        n = 20
+        if args.strip().isdigit():
+            n = int(args.strip())
+        entries = audit_logger.get_recent(n, session_id=session_id)
+        if not entries:
+            return _msg("No audit entries found.")
+        lines = []
+        for e in entries:
+            status = "ok" if e.get("success") else "FAIL"
+            lines.append(
+                f"- `{e['ts'][:19]}` **{e['tool']}** ({e['duration_ms']}ms) [{status}] — {e.get('result_summary', '')[:80]}"
+            )
+        return _msg(f"**Recent audit log ({len(entries)} entries):**\n" + "\n".join(lines))
+
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Audit logging — wraps ToolRegistry.execute
+# ---------------------------------------------------------------------------
+
+_current_session_id: contextvars.ContextVar[str] = contextvars.ContextVar(
+    "_current_session_id", default=""
+)
+
+
+def _install_audit_wrapper():
+    """Monkey-patch _agent.tools.execute to log tool calls."""
+    from audit import audit_logger
+
+    original_execute = _agent.tools.execute
+
+    async def _audited_execute(name: str, params: dict[str, Any]) -> str:
+        session_id = _current_session_id.get("")
+        t0 = time.monotonic()
+        try:
+            result = await original_execute(name, params)
+            duration_ms = int((time.monotonic() - t0) * 1000)
+            success = not (isinstance(result, str) and result.startswith("Error"))
+            audit_logger.log(
+                session_id=session_id,
+                tool=name,
+                args=params,
+                result_summary=result[:200] if isinstance(result, str) else str(result)[:200],
+                duration_ms=duration_ms,
+                success=success,
+            )
+            return result
+        except Exception as exc:
+            duration_ms = int((time.monotonic() - t0) * 1000)
+            audit_logger.log(
+                session_id=session_id,
+                tool=name,
+                args=params,
+                result_summary=str(exc)[:200],
+                duration_ms=duration_ms,
+                success=False,
+            )
+            raise
+
+    _agent.tools.execute = _audited_execute
+
+
+# ---------------------------------------------------------------------------
 # Chat function
 # ---------------------------------------------------------------------------
 
@@ -125,35 +255,50 @@ def _strip_think(text: str) -> str:
 
 async def chat(message: str, session_id: str) -> list[dict[str, Any]]:
     """Process a message through nanobot's agent loop."""
-    progress_messages: list[dict] = []
+    # Handle slash commands before hitting the agent
+    stripped = message.strip()
+    if stripped.startswith("/"):
+        parts = stripped.split(None, 1)
+        cmd = parts[0][1:].lower()
+        args = parts[1] if len(parts) > 1 else ""
+        result = await _handle_command(cmd, args, session_id)
+        if result is not None:
+            return result
 
-    async def on_progress(content: str, *, tool_hint: bool = False) -> None:
-        content = _strip_think(content)
-        if not content:
-            return
-        if tool_hint:
-            progress_messages.append({
-                "role": "assistant",
-                "metadata": {"title": f"🔧 {content}"},
-                "content": "",
-            })
-        else:
-            progress_messages.append({
-                "role": "assistant",
-                "metadata": {"title": "💭 Thinking"},
-                "content": content,
-            })
+    # Set session context for audit logging
+    token = _current_session_id.set(session_id)
+    try:
+        progress_messages: list[dict] = []
 
-    response = await _agent.process_direct(
-        content=message,
-        session_key=f"gradio:{session_id}",
-        channel="gradio",
-        chat_id=session_id,
-        on_progress=on_progress,
-    )
+        async def on_progress(content: str, *, tool_hint: bool = False) -> None:
+            content = _strip_think(content)
+            if not content:
+                return
+            if tool_hint:
+                progress_messages.append({
+                    "role": "assistant",
+                    "metadata": {"title": f"🔧 {content}"},
+                    "content": "",
+                })
+            else:
+                progress_messages.append({
+                    "role": "assistant",
+                    "metadata": {"title": "💭 Thinking"},
+                    "content": content,
+                })
 
-    response = _strip_think(response or "")
-    return [*progress_messages, {"role": "assistant", "content": response}]
+        response = await _agent.process_direct(
+            content=message,
+            session_key=f"gradio:{session_id}",
+            channel="gradio",
+            chat_id=session_id,
+            on_progress=on_progress,
+        )
+
+        response = _strip_think(response or "")
+        return [*progress_messages, {"role": "assistant", "content": response}]
+    finally:
+        _current_session_id.reset(token)
 
 
 # ---------------------------------------------------------------------------
@@ -168,6 +313,18 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     _init_agent(args.config)
+
+    # Feature 2: Install audit logging wrapper
+    _install_audit_wrapper()
+
+    # Feature 3: Register browser tool
+    from tools.browser import BrowserTool
+    _agent.tools.register(BrowserTool())
+
+    # Feature 4: Register vector memory (silent if Ollama unavailable)
+    from tools.vector_memory import VectorMemory
+    _vector_memory = VectorMemory()
+    _agent.tools.register(_vector_memory.as_tool())
 
     model_name = _agent.model
 

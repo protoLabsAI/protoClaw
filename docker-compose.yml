@@ -23,6 +23,11 @@ services:
       - /sandbox:size=256M,uid=1000,gid=1000
       - /home/sandbox:size=128M,uid=1000,gid=1000
 
+    # Persistent volumes
+    volumes:
+      - protoclaw-vectors:/sandbox/memory
+      - protoclaw-audit:/sandbox/audit
+
     # Expose Gradio UI
     ports:
       - "7865:7865"   # protoClaw Gradio UI
@@ -48,3 +53,7 @@ services:
     tty: true
 
     command: ["/opt/protoclaw/entrypoint.sh"]
+
+volumes:
+  protoclaw-vectors:
+  protoclaw-audit:

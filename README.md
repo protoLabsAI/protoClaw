@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="https://i.ibb.co/chYFB702/proto-Claw.jpg" alt="protoClaw" width="600" />
+</p>
+
 # protoClaw
 
 Sandboxed AI agent powered by local LLMs. Built on [nanobot](https://github.com/HKUDS/nanobot) with [NemoClaw](https://github.com/NVIDIA/NemoClaw)-inspired container security.
