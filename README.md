@@ -74,9 +74,57 @@ docker run --rm -it \
 docker compose up
 ```
 
+## Tools
+
+Tools are registered at startup in `server.py`. Each loads conditionally based on available dependencies.
+
+| Tool | Source | Condition | Description |
+|------|--------|-----------|-------------|
+| **Shell, Files, Web** | nanobot built-in | Always | exec, read/write/edit files, web search/fetch |
+| **Browser** | `tools/browser.py` | Always | Web automation via [agent-browser](https://github.com/anthropics/agent-browser) CLI — open, snapshot, click, fill, find |
+| **Memory** | `tools/vector_memory.py` | Always (graceful fallback) | Semantic vector search via Ollama `nomic-embed-text` + `sqlite-vec`. Silent if Ollama unreachable |
+| **Beads** | MCP (stdio) | Always | Issue tracking via [beads](https://github.com/Dicklesworthstone/beads_rust) — create, query, close issues with dependencies. Tools prefixed `mcp_beads_*` |
+| **Claude** | `tools/claude.py` | Credentials found | Claude Code CLI for complex reasoning. **Rate-limited** (10 calls/24h). Only loads if auth is available |
+| **Audit** | `audit.py` | Always | JSONL logging of all tool executions (not a tool itself, wraps `ToolRegistry.execute`) |
+
+### Claude tool auth chain
+
+The Claude tool only registers if credentials exist. Auth is resolved in order:
+
+1. `ANTHROPIC_API_KEY` env var (pass via docker-compose or `.env`)
+2. `ANTHROPIC_AUTH_TOKEN` env var (OAuth bearer)
+3. CLI credentials at `~/.claude/.credentials.json` (from `claude login` on host, mounted read-only)
+
+If none are found, the tool is **not registered** — the agent never sees it and can't attempt to use it.
+
+### Adding MCP servers at runtime
+
+```
+/mcp                                          # list connected servers + tools
+/mcp add myserver {"command": "npx", "args": ["@org/mcp-server"]}
+/mcp remove myserver
+```
+
+Changes persist to `nanobot-config.json`. MCP tools appear as `mcp_<server>_<tool>`.
+
+### Slash commands
+
+| Command | Description |
+|---------|-------------|
+| `/new` | Clear chat + nanobot session |
+| `/clear` | Clear chat display (session preserved) |
+| `/think <level>` | Set reasoning effort (low/medium/high/off) |
+| `/compact` | Force memory consolidation |
+| `/model` | Show current model |
+| `/tools` | List registered tools |
+| `/audit [n]` | Show recent audit log |
+| `/mcp` | Manage MCP servers |
+| `/beads [cmd]` | Quick issue queries (ready/list/stats/blocked) |
+| `/help` | Show command list |
+
 ## Configuration
 
-Edit `config/nanobot-config.json` to change the model, provider, or tools. Edit `config/opencode.json` for OpenCode settings. Both point to `host.docker.internal:8000` by default.
+Edit `config/nanobot-config.json` to change the model, provider, MCP servers, or tools. Edit `config/opencode.json` for OpenCode settings. Both point to `host.docker.internal:8000` by default.
 
 ## Custom providers
 

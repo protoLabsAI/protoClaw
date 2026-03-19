@@ -523,9 +523,12 @@ if __name__ == "__main__":
     _vector_memory = VectorMemory()
     _agent.tools.register(_vector_memory.as_tool())
 
-    # Register Claude Code tool (silent if no API key)
-    from tools.claude import ClaudeTool
-    _agent.tools.register(ClaudeTool())
+    # Register Claude Code tool only if credentials exist
+    from tools.claude import ClaudeTool, is_claude_available
+    if is_claude_available():
+        _agent.tools.register(ClaudeTool())
+    else:
+        print("Claude tool: skipped (no credentials found)")
 
     model_name = _agent.model
 
