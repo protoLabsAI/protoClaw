@@ -607,7 +607,7 @@ def _build_settings_callbacks() -> dict:
             choices.extend([
                 "claude: claude-sonnet-4-6",
                 "claude: claude-opus-4-6",
-                "claude: claude-haiku-4-5-20251001",
+                "claude: claude-haiku-4-5",
             ])
         return choices
 

@@ -60,7 +60,7 @@ _FRIENDS: list[Friend] = [
     Friend(
         name="claude-haiku",
         provider="claude",
-        model="claude-haiku-4-5-20251001",
+        model="claude-haiku-4-5",
         intelligence="strong",
         cost="paid (cheapest)",
         skills="Fast and cost-efficient, good for simple reasoning tasks",
@@ -143,7 +143,7 @@ _TIMEOUT = 120  # seconds
 _CLAUDE_MODEL_MAP = {
     "claude-opus-4-6": "opus",
     "claude-sonnet-4-6": "sonnet",
-    "claude-haiku-4-5-20251001": "haiku",
+    "claude-haiku-4-5": "haiku",
 }
 
 

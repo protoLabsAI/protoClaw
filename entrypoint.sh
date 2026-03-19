@@ -11,9 +11,10 @@ if [ -f /opt/claude-creds/.credentials.json ]; then
     cp /opt/claude-creds/.credentials.json /home/sandbox/.claude/.credentials.json
     chmod 600 /home/sandbox/.claude/.credentials.json
 
-    # Export OAuth token as ANTHROPIC_API_KEY if not already set
+    # Export OAuth token as ANTHROPIC_API_KEY if not already set with a real value
     # This lets summarize CLI, claude CLI, and other tools use it
-    if [ -z "$ANTHROPIC_API_KEY" ]; then
+    # Note: docker-compose may set ANTHROPIC_API_KEY="" (empty), so check for non-empty
+    if [ -z "${ANTHROPIC_API_KEY:-}" ] || [ "$ANTHROPIC_API_KEY" = "" ]; then
         TOKEN=$(python3 -c "import json; d=json.load(open('/home/sandbox/.claude/.credentials.json')); print(d.get('claudeAiOauth',{}).get('accessToken',''))" 2>/dev/null)
         if [ -n "$TOKEN" ]; then
             export ANTHROPIC_API_KEY="$TOKEN"
