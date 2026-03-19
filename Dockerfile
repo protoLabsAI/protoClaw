@@ -39,6 +39,7 @@ RUN pip install --no-cache-dir /opt/nanobot/ gradio sqlite-vec httpx
 # Install protoClaw providers, tools, and server
 COPY providers/ /opt/protoclaw/providers/
 COPY tools/ /opt/protoclaw/tools/
+COPY skills/ /opt/protoclaw/skills/
 COPY scripts/install-providers.py /opt/protoclaw/
 COPY audit.py /opt/protoclaw/audit.py
 COPY chat_ui.py /opt/protoclaw/chat_ui.py

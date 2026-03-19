@@ -23,6 +23,9 @@ cp /opt/protoclaw/config/opencode.json /home/sandbox/.config/opencode/opencode.j
 mkdir -p /sandbox
 cp /opt/protoclaw/config/SOUL.md /sandbox/SOUL.md
 
+# Copy skills into workspace (nanobot reads skills/ from workspace)
+cp -r /opt/protoclaw/skills /sandbox/skills
+
 # Initialize beads issue tracker if not already present
 if [ ! -d /sandbox/.beads ]; then
     cd /sandbox && br init 2>/dev/null || true
