@@ -2,7 +2,7 @@
   "agents": {
     "defaults": {
       "workspace": "/sandbox",
-      "model": "Tesslate/OmniCoder-9B",
+      "model": "auto",
       "provider": "vllm",
       "maxTokens": 4096,
       "contextWindowTokens": 262144,

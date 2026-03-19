@@ -49,7 +49,7 @@ def _init_agent(config_path: str | None = None):
         bus=bus,
         provider=provider,
         workspace=_config.workspace_path,
-        model=_config.agents.defaults.model,
+        model=None,  # auto-detected from provider
         max_iterations=_config.agents.defaults.max_tool_iterations,
         context_window_tokens=_config.agents.defaults.context_window_tokens,
         web_search_config=_config.tools.web.search,
@@ -62,14 +62,34 @@ def _init_agent(config_path: str | None = None):
     )
 
 
+def _detect_vllm_model(api_base: str) -> str | None:
+    """Query vLLM /v1/models to get the currently loaded model."""
+    import httpx
+    try:
+        resp = httpx.get(f"{api_base}/models", timeout=5)
+        data = resp.json().get("data", [])
+        if data:
+            return data[0]["id"]
+    except Exception:
+        pass
+    return None
+
+
 def _make_provider(config):
-    """Create provider — mirrors nanobot CLI logic with OmniCoder support."""
+    """Create provider — auto-detects vLLM model, uses OmniCoder provider when needed."""
     from nanobot.providers.base import GenerationSettings
     from nanobot.providers.litellm_provider import LiteLLMProvider
 
     model = config.agents.defaults.model
     provider_name = config.get_provider_name(model)
     p = config.get_provider(model)
+    api_base = config.get_api_base(model)
+
+    # Auto-detect model from vLLM if configured as "auto" or if we can reach the endpoint
+    if api_base and (model == "auto" or provider_name in ("vllm", "ollama")):
+        detected = _detect_vllm_model(api_base)
+        if detected:
+            model = detected
 
     provider_cls = LiteLLMProvider
     if "omnicoder" in model.lower():
@@ -78,7 +98,7 @@ def _make_provider(config):
 
     provider = provider_cls(
         api_key=p.api_key if p else None,
-        api_base=config.get_api_base(model),
+        api_base=api_base,
         default_model=model,
         extra_headers=p.extra_headers if p else None,
         provider_name=provider_name,
@@ -149,7 +169,7 @@ if __name__ == "__main__":
 
     _init_agent(args.config)
 
-    model_name = _config.agents.defaults.model
+    model_name = _agent.model
 
     app = create_chat_app(
         chat_fn=chat,
