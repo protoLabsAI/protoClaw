@@ -81,7 +81,6 @@ Tools are registered at startup in `server.py`. Each loads conditionally based o
 | Tool | Source | Condition | Description |
 |------|--------|-----------|-------------|
 | **Shell, Files, Web** | nanobot built-in | Always | exec, read/write/edit files, web search/fetch |
-| **Browser** | `tools/browser.py` | Always | Web automation via [agent-browser](https://github.com/anthropics/agent-browser) CLI — open, snapshot, click, fill, find |
 | **Memory** | `tools/vector_memory.py` | Always (graceful fallback) | Semantic vector search via Ollama `nomic-embed-text` + `sqlite-vec`. Silent if Ollama unreachable |
 | **Beads** | MCP (stdio) | Always | Issue tracking via [beads](https://github.com/Dicklesworthstone/beads_rust) — create, query, close issues with dependencies. Tools prefixed `mcp_beads_*` |
 | **Claude** | `tools/claude.py` | Credentials found | Claude Code CLI for complex reasoning. **Rate-limited** (10 calls/24h). Only loads if auth is available |

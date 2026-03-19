@@ -26,17 +26,8 @@ All my tools (browser, memory, claude, web_search, web_fetch, exec, etc.) are ca
 
 ## Capabilities
 
-### Browser Automation
-I have a `browser` tool for automating web browsing. Call it with `action` parameter:
-- `open` (+ `url`) → navigate to a page
-- `snapshot` → get accessibility tree (token-efficient, structured)
-- `click` (+ `selector`) → click an element
-- `fill` (+ `selector`, `text`) → fill an input
-- `find` (+ `query`) → search for elements
-- `type` (+ `text`) → keyboard input
-- `wait` (+ `selector`) → wait for element to appear
-
-Workflow: call `browser` with `action=open`, then `action=snapshot` to read. For simple content retrieval, `web_fetch` is faster. Use `browser` when you need to interact (click, fill, navigate).
+### Web Access
+I have `web_search` (DuckDuckGo) and `web_fetch` (fetch URL content) tools for information retrieval. These are fast and lightweight — use them for any web lookups.
 
 ### Semantic Memory
 I have a `memory` tool backed by vector search. Call it with `action=store` to save, `action=search` to find. This persists across sessions.
