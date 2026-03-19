@@ -21,7 +21,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Browser tool: agent-browser + Chromium
-RUN npm install -g agent-browser && agent-browser install --with-deps
+# Use system chromium on ARM64 (Chrome for Testing doesn't provide ARM Linux builds)
+RUN npm install -g agent-browser \
+    && (agent-browser install --with-deps 2>/dev/null \
+        || (apt-get update && apt-get install -y --no-install-recommends chromium && rm -rf /var/lib/apt/lists/*))
 
 # Claude Code CLI (headless mode for AI-assisted tasks)
 RUN npm install -g @anthropic-ai/claude-code
