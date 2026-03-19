@@ -43,7 +43,9 @@ CLEAN_CSS = """
     .chatbot button[aria-label="Dislike"], .chatbot button[aria-label="Retry"],
     .badge-wrap, .chatbot .badge-wrap,
     span.chatbot-badge, .chatbot-badge,
-    .built-with-gradio, a[href*="gradio.app"] {
+    .built-with-gradio, a[href*="gradio.app"],
+    .show-api, button.show-api, #show-api-btn,
+    [class*="show-api"], .api-docs-btn {
         display: none !important;
     }
 """
@@ -247,6 +249,7 @@ def create_chat_app(
             theme=_theme,
             css=_css,
             head=_head,
+            analytics_enabled=False,
         ) as app:
             session_id = gr.State("default")
 

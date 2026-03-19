@@ -801,7 +801,7 @@ def _build_settings_callbacks() -> dict:
 
     def get_subtitle() -> str:
         display_model = (_agent.model or "").replace("openai/", "")
-        return f"**protoClaw** &nbsp; `{display_model}`"
+        return f"**🦀 protoClaw** &nbsp; `{display_model}`"
 
     return {
         "get_mcp_config": get_mcp_config,
@@ -868,7 +868,7 @@ def _main():
 
     blocks = create_chat_app(
         chat_fn=chat,
-        title="protoClaw",
+        title="🦀 protoClaw",
         subtitle="",
         placeholder="Ask protoClaw anything...",
         settings=_build_settings_callbacks(),
@@ -921,7 +921,7 @@ def _main():
         )
 
     # Mount Gradio at root — PWA routes above take precedence
-    app = gr.mount_gradio_app(fastapi_app, blocks, path="/")
+    app = gr.mount_gradio_app(fastapi_app, blocks, path="/", footer_links=[])
 
     print(f"[protoClaw] Starting on http://0.0.0.0:{args.port}")
     uvicorn.run(app, host="0.0.0.0", port=args.port)
