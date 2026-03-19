@@ -28,6 +28,8 @@ services:
       - protoclaw-vectors:/sandbox/memory
       - protoclaw-audit:/sandbox/audit
       - protoclaw-beads:/sandbox/.beads
+      # Mount host Claude credentials for CLI OAuth fallback (read-only)
+      - ${HOME}/.claude:/home/sandbox/.claude:ro
 
     # Expose Gradio UI
     ports:

@@ -3,16 +3,83 @@
 Gives the agent access to Claude (Anthropic) for complex reasoning,
 code review, self-improvement, and tasks beyond the local LLM's capability.
 
-Requires ANTHROPIC_API_KEY environment variable in the container.
+Auth chain (mirrors protoAgent-starter pattern):
+  1. ANTHROPIC_API_KEY env var
+  2. ANTHROPIC_AUTH_TOKEN env var (OAuth bearer token)
+  3. Claude CLI credentials (~/.claude/.credentials.json or ~/.claude/credentials.json)
+
 Uses headless mode: claude -p "prompt" --output-format json
 """
 
 import asyncio
 import json
 import os
+from pathlib import Path
 from typing import Any
 
 from nanobot.agent.tools.base import Tool
+
+
+def _read_cli_oauth_token() -> str | None:
+    """Read OAuth token from Claude CLI credential files.
+
+    Checks (in order):
+      ~/.claude/.credentials.json  → claudeAiOauth.accessToken
+      ~/.claude/credentials.json   → oauth_token or access_token
+    """
+    home = Path.home()
+    # Modern format
+    modern = home / ".claude" / ".credentials.json"
+    if modern.exists():
+        try:
+            data = json.loads(modern.read_text())
+            token = (data.get("claudeAiOauth") or {}).get("accessToken")
+            if token:
+                return token
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    # Legacy format
+    legacy = home / ".claude" / "credentials.json"
+    if legacy.exists():
+        try:
+            data = json.loads(legacy.read_text())
+            token = data.get("oauth_token") or data.get("access_token")
+            if token:
+                return token
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    return None
+
+
+def _resolve_auth() -> dict[str, str]:
+    """Resolve auth credentials. Returns env dict to merge into subprocess.
+
+    Priority:
+      1. ANTHROPIC_API_KEY already in env
+      2. ANTHROPIC_AUTH_TOKEN already in env
+      3. CLI OAuth token from credentials files → set as ANTHROPIC_API_KEY
+    """
+    if os.environ.get("ANTHROPIC_API_KEY"):
+        return {}
+    if os.environ.get("ANTHROPIC_AUTH_TOKEN"):
+        return {}
+    token = _read_cli_oauth_token()
+    if token:
+        return {"ANTHROPIC_API_KEY": token}
+    return {}
+
+
+def is_claude_available() -> bool:
+    """Check if Claude auth is available via any method."""
+    if os.environ.get("ANTHROPIC_API_KEY"):
+        return True
+    if os.environ.get("ANTHROPIC_AUTH_TOKEN"):
+        return True
+    if _read_cli_oauth_token():
+        return True
+    return False
 
 
 class ClaudeTool(Tool):
@@ -56,8 +123,12 @@ class ClaudeTool(Tool):
         }
 
     async def execute(self, **kwargs: Any) -> str:
-        if not os.environ.get("ANTHROPIC_API_KEY"):
-            return "Error: ANTHROPIC_API_KEY not set. Claude tool unavailable."
+        auth_env = _resolve_auth()
+        if not auth_env and not os.environ.get("ANTHROPIC_API_KEY") and not os.environ.get("ANTHROPIC_AUTH_TOKEN"):
+            return (
+                "Error: No Claude credentials found. Set ANTHROPIC_API_KEY, "
+                "ANTHROPIC_AUTH_TOKEN, or run `claude login` to authenticate."
+            )
 
         prompt = kwargs["prompt"]
         max_turns = min(kwargs.get("max_turns", 5), 20)
@@ -74,12 +145,16 @@ class ClaudeTool(Tool):
         if allowed_tools and allowed_tools != "all":
             cmd.extend(["--allowedTools", allowed_tools])
 
+        # Merge auth env into subprocess environment
+        env = {**os.environ, **auth_env}
+
         try:
             proc = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd="/sandbox",
+                env=env,
             )
             stdout, stderr = await asyncio.wait_for(
                 proc.communicate(), timeout=self._TIMEOUT
