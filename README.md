@@ -83,7 +83,7 @@ Tools are registered at startup in `server.py`. Each loads conditionally based o
 | **Shell, Files, Web** | nanobot built-in | Always | exec, read/write/edit files, web search/fetch |
 | **Browser** | `tools/browser.py` | Always | Web automation via agent-browser CLI — open, snapshot, click, fill, find. Chrome profile uses `/tmp` (512MB) |
 | **Memory** | `tools/vector_memory.py` | Always (graceful fallback) | Semantic vector search via Ollama `nomic-embed-text` + `sqlite-vec`. Silent if Ollama unreachable |
-| **Beads** | MCP (stdio) | Always | Issue tracking via [beads](https://github.com/Dicklesworthstone/beads_rust) — create, query, close issues with dependencies. Tools prefixed `mcp_beads_*` |
+| **Beads** | `tools/beads.py` | Always | Issue tracking via [beads](https://github.com/Dicklesworthstone/beads_rust) `br` CLI — create, query, close issues with dependency-driven ready queue |
 | **Claude** | `tools/claude.py` | Credentials found | Claude Code CLI for complex reasoning. **Rate-limited** (10 calls/24h). Only loads if auth is available |
 | **Audit** | `audit.py` | Always | JSONL logging of all tool executions (not a tool itself, wraps `ToolRegistry.execute`) |
 

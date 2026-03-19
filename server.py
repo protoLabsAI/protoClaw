@@ -519,6 +519,10 @@ def _main():
     from tools.browser import BrowserTool
     _agent.tools.register(BrowserTool())
 
+    # Register beads issue tracker
+    from tools.beads import BeadsTool
+    _agent.tools.register(BeadsTool())
+
     # Register vector memory (silent if Ollama unavailable)
     from tools.vector_memory import VectorMemory
     _vector_memory = VectorMemory()

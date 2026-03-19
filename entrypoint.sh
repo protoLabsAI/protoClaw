@@ -35,8 +35,9 @@ cp /opt/protoclaw/config/SOUL.md /sandbox/SOUL.md
 # Copy skills into workspace (nanobot reads skills/ from workspace)
 cp -r /opt/protoclaw/skills /sandbox/skills
 
-# Initialize beads issue tracker if not already present
-if [ ! -d /sandbox/.beads ]; then
+# Initialize beads issue tracker (persistent via /opt/.beads volume)
+ln -sf /opt/.beads /sandbox/.beads
+if [ ! -f /opt/.beads/beads.db ]; then
     cd /sandbox && br init 2>/dev/null || true
 fi
 

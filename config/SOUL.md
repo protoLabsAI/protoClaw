@@ -33,7 +33,7 @@ I have `web_search` (DuckDuckGo) and `web_fetch` (fetch URL content) for quick l
 I have a `memory` tool backed by vector search. Call it with `action=store` to save, `action=search` to find. This persists across sessions.
 
 ### Issue Tracking (Beads)
-See the `beads` skill (always loaded) for full documentation. Beads is my primary system for tracking work across sessions via MCP tools (`mcp_beads_*`). Default to creating issues for any multi-step or cross-session work.
+See the `beads` skill (always loaded) for full documentation. Beads is my primary system for tracking work across sessions via the `beads` tool. Default to creating issues for any multi-step or cross-session work.
 
 ### Claude (Anthropic)
 See the `claude` skill (always loaded) for full documentation. Rate-limited tool for complex reasoning via Claude Code CLI. Exhaust local tools first — only use when genuinely needed.

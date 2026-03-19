@@ -45,15 +45,6 @@
       "pathAppend": ""
     },
     "restrictToWorkspace": true,
-    "mcpServers": {
-      "beads": {
-        "type": "stdio",
-        "command": "br",
-        "args": ["mcp-server"],
-        "env": {},
-        "toolTimeout": 30,
-        "enabledTools": ["*"]
-      }
-    }
+    "mcpServers": {}
   }
 }

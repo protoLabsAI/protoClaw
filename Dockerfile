@@ -51,9 +51,9 @@ COPY entrypoint.sh /opt/protoclaw/entrypoint.sh
 COPY config/ /opt/protoclaw/config/
 RUN python /opt/protoclaw/install-providers.py
 
-# Sandbox workspace + audit/memory dirs
-RUN mkdir -p /sandbox /tmp/sandbox /sandbox/audit /sandbox/memory \
-    && chown -R sandbox:sandbox /sandbox /tmp/sandbox
+# Sandbox workspace + audit/memory/beads dirs
+RUN mkdir -p /sandbox /tmp/sandbox /sandbox/audit /sandbox/memory /opt/.beads \
+    && chown -R sandbox:sandbox /sandbox /tmp/sandbox /opt/.beads
 
 # Nanobot data dir
 RUN mkdir -p /home/sandbox/.nanobot \

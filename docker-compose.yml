@@ -27,7 +27,7 @@ services:
     volumes:
       - protoclaw-vectors:/sandbox/memory
       - protoclaw-audit:/sandbox/audit
-      - protoclaw-beads:/sandbox/.beads
+      - protoclaw-beads:/opt/.beads
       # Mount host Claude credentials for CLI OAuth fallback (read-only)
       # Mounted to /opt/claude-creds (not /home/sandbox) because tmpfs overwrites /home/sandbox
       - ${HOME}/.claude:/opt/claude-creds:ro

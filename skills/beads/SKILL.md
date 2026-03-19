@@ -6,7 +6,7 @@ always: true
 
 # Beads Issue Tracker
 
-You have access to the Beads issue tracker via MCP tools (`mcp_beads_*`). Beads is your **persistent memory for work** — your session memory resets, but beads persists across sessions. Use it to track everything that matters.
+You have a `beads` tool that wraps the `br` CLI. Beads is your **persistent memory for work** — your session memory resets, but beads persists across sessions. Use it to track everything that matters.
 
 ## Core Concept
 
@@ -82,19 +82,25 @@ open → in_progress → closed
 2. Update in-progress items with comments about current state
 3. Create issues for anything discovered but not yet addressed
 
-## MCP Tools Available
+## How to Call
 
-All beads tools are prefixed `mcp_beads_`. Key tools:
+Use the `beads` tool with a `command` parameter containing any `br` subcommand. Output is always JSON.
 
-| Tool | Purpose |
-|------|---------|
-| `ListIssuesTool` | Query issues with filters (status, priority, assignee, labels) |
-| `ShowIssueTool` | Get full issue details with dependencies and comments |
-| `CreateIssueTool` | Create new issues with title, description, type, priority, labels |
-| `UpdateIssueTool` | Change status, priority, assignee, add labels |
-| `CloseIssueTool` | Resolve issues with a close reason |
-| `ManageDependenciesTool` | Add/remove dependency relationships |
-| `ProjectOverviewTool` | High-level summary of all work |
+**Examples:**
+```
+beads(command="ready")
+beads(command="create \"Fix login bug\" --type bug -p 1")
+beads(command="show bd-abc123")
+beads(command="update bd-abc123 --status in_progress")
+beads(command="close bd-abc123 --reason \"Fixed in commit abc\"")
+beads(command="dep add bd-child bd-parent")
+beads(command="comment add bd-abc123 \"Found root cause: missing index\"")
+beads(command="list --status open")
+beads(command="search \"timeout\"")
+beads(command="stats")
+beads(command="blocked")
+beads(command="label add bd-abc123 backend auth")
+```
 
 ## Decomposition Pattern
 
