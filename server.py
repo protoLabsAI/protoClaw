@@ -213,7 +213,7 @@ async def _handle_command(cmd: str, args: str, session_id: str) -> list[dict[str
 # /mcp subcommands — runtime MCP server management
 # ---------------------------------------------------------------------------
 
-_config_path: Path | None = None  # set in main
+_config_path = None  # Path | None, set in main
 
 
 async def _handle_mcp_command(args: str) -> list[dict[str, Any]]:
@@ -497,7 +497,9 @@ async def chat(message: str, session_id: str) -> list[dict[str, Any]]:
 # Entrypoint
 # ---------------------------------------------------------------------------
 
-if __name__ == "__main__":
+def _main():
+    global _config_path
+
     parser = argparse.ArgumentParser(description="protoClaw Gradio UI")
     parser.add_argument("--port", type=int, default=7865)
     parser.add_argument("--config", type=str, default=None)
@@ -507,7 +509,6 @@ if __name__ == "__main__":
     _init_agent(args.config)
 
     # Track config path for /mcp persistence
-    global _config_path
     if args.config:
         _config_path = Path(args.config).expanduser().resolve()
 
@@ -544,3 +545,7 @@ if __name__ == "__main__":
         server_port=args.port,
         share=args.share,
     )
+
+
+if __name__ == "__main__":
+    _main()
