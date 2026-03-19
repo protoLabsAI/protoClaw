@@ -1,0 +1,23 @@
+# CLIProxyAPI config — OpenAI-compatible proxy for Claude Code OAuth
+# Docs: https://help.router-for.me/
+
+# Bind to localhost only (container-internal traffic)
+host: "127.0.0.1"
+port: 8317
+
+# Auth dir for OAuth tokens (persisted via volume)
+auth-dir: "/opt/.cliproxy"
+
+# API key for accessing the proxy from within the container
+# nanobot/litellm uses this to authenticate against the proxy
+api-keys:
+  - "protoclaw-internal"
+
+# Disable remote management (not needed inside container)
+remote-management:
+  allow-remote: false
+  secret-key: ""
+  disable-control-panel: true
+
+debug: false
+logging-to-file: false

@@ -38,9 +38,18 @@ RUN curl -fsSL "https://github.com/Dicklesworthstone/beads_rust/releases/downloa
     | tar xz -C /usr/local/bin \
     && chmod +x /usr/local/bin/br
 
+# CLIProxyAPI — OpenAI-compatible proxy that uses Claude Code OAuth
+# Provides /v1/chat/completions endpoint backed by Claude subscription
+# Fork: github.com/protoLabsAI/CLIProxyAPI (using upstream binaries until fork has custom releases)
+ARG CLIPROXY_VERSION=6.8.55
+RUN ARCH=$(dpkg --print-architecture) \
+    && curl -fsSL "https://github.com/router-for-me/CLIProxyAPI/releases/download/v${CLIPROXY_VERSION}/CLIProxyAPI_${CLIPROXY_VERSION}_linux_${ARCH}.tar.gz" \
+    | tar xz -C /usr/local/bin cli-proxy-api \
+    && chmod +x /usr/local/bin/cli-proxy-api
+
 # Install nanobot from submodule
 COPY nanobot/ /opt/nanobot/
-RUN pip install --no-cache-dir /opt/nanobot/ gradio sqlite-vec httpx
+RUN pip install --no-cache-dir /opt/nanobot/ gradio sqlite-vec httpx uvicorn
 
 # Install protoClaw providers, tools, and server
 COPY providers/ /opt/protoclaw/providers/
@@ -52,6 +61,7 @@ COPY chat_ui.py /opt/protoclaw/chat_ui.py
 COPY server.py /opt/protoclaw/server.py
 COPY entrypoint.sh /opt/protoclaw/entrypoint.sh
 COPY config/ /opt/protoclaw/config/
+COPY static/ /opt/protoclaw/static/
 RUN python /opt/protoclaw/install-providers.py
 
 # Sandbox workspace + audit/memory/beads dirs
@@ -66,9 +76,13 @@ RUN mkdir -p /home/sandbox/.nanobot \
 RUN mkdir -p /home/sandbox/.config/opencode \
     && chown -R sandbox:sandbox /home/sandbox/.config
 
+# CLIProxyAPI auth dir (persisted via volume)
+RUN mkdir -p /opt/.cliproxy \
+    && chown -R sandbox:sandbox /opt/.cliproxy
+
 # Drop to sandbox user
 USER sandbox
 WORKDIR /sandbox
 
-EXPOSE 7865 7866
+EXPOSE 7865 7866 8317
 CMD ["/opt/protoclaw/entrypoint.sh"]

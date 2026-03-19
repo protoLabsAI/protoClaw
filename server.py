@@ -30,10 +30,10 @@ def _init_agent(config_path: str | None = None):
     """Initialize nanobot agent loop (called once at startup)."""
     global _agent, _config
 
-    from nanobot.config.loader import load_config, set_config_path
-    from nanobot.config.paths import get_cron_dir
     from nanobot.agent.loop import AgentLoop
     from nanobot.bus.queue import MessageBus
+    from nanobot.config.loader import load_config, set_config_path
+    from nanobot.config.paths import get_cron_dir
     from nanobot.cron.service import CronService
     from nanobot.utils.helpers import sync_workspace_templates
 
@@ -69,6 +69,7 @@ def _init_agent(config_path: str | None = None):
 def _detect_vllm_model(api_base: str) -> str | None:
     """Query vLLM /v1/models to get the currently loaded model."""
     import httpx
+
     try:
         resp = httpx.get(f"{api_base}/models", timeout=5)
         data = resp.json().get("data", [])
@@ -98,6 +99,7 @@ def _make_provider(config):
     provider_cls = LiteLLMProvider
     if "omnicoder" in model.lower():
         from nanobot.providers.omnicoder_provider import OmniCoderProvider
+
         provider_cls = OmniCoderProvider
 
     provider = provider_cls(
@@ -115,6 +117,67 @@ def _make_provider(config):
         reasoning_effort=defaults.reasoning_effort,
     )
     return provider
+
+
+# ---------------------------------------------------------------------------
+# MCP startup health check
+# ---------------------------------------------------------------------------
+
+_MCP_HEALTH_RETRIES = 3
+_MCP_HEALTH_RETRY_DELAY = 2  # seconds (exponential: 2, 4, 8)
+
+
+async def _startup_mcp_health_check() -> None:
+    """Verify MCP server connectivity at startup with retry logic.
+
+    Checks that the protolabs MCP tools are registered and callable.
+    Logs connectivity status to stdout. Gracefully degrades if unavailable.
+    """
+    mcp_servers = _agent._mcp_servers or {}
+    if not mcp_servers:
+        print("[MCP] No MCP servers configured — skipping health check")
+        return
+
+    server_names = ", ".join(mcp_servers.keys())
+    print(f"[MCP] Configured servers: {server_names}")
+
+    health_tool = "mcp_protolabs_health_check"
+    board_tool = "mcp_protolabs_get_board_summary"
+
+    for attempt in range(1, _MCP_HEALTH_RETRIES + 1):
+        tool_names = set(_agent.tools.tool_names)
+
+        if health_tool in tool_names:
+            print(f"[MCP] ✓ Tool registered: {health_tool}")
+            # Try calling the health check tool
+            try:
+                result = await _agent.tools.execute(health_tool, {})
+                print(f"[MCP] ✓ {health_tool} responded: {str(result)[:120]}")
+            except Exception as exc:
+                print(f"[MCP] ✗ {health_tool} call failed: {exc}")
+
+            if board_tool in tool_names:
+                print(f"[MCP] ✓ Tool available: {board_tool}")
+            else:
+                print(f"[MCP] ⚠ Tool not found: {board_tool}")
+
+            print("[MCP] Connectivity check complete.")
+            return
+
+        if attempt < _MCP_HEALTH_RETRIES:
+            delay = _MCP_HEALTH_RETRY_DELAY * (2 ** (attempt - 1))
+            print(
+                f"[MCP] Tools not yet registered (attempt {attempt}/{_MCP_HEALTH_RETRIES})"
+                f" — retrying in {delay}s…"
+            )
+            await asyncio.sleep(delay)
+
+    # All retries exhausted
+    configured = list(mcp_servers.keys())
+    print(
+        f"[MCP] ✗ MCP server(s) {configured} unavailable after "
+        f"{_MCP_HEALTH_RETRIES} attempts — proceeding without MCP (graceful degradation)"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -146,7 +209,9 @@ def _msg(content: str) -> list[dict[str, Any]]:
     return [{"role": "assistant", "content": content}]
 
 
-async def _handle_command(cmd: str, args: str, session_id: str) -> list[dict[str, Any]] | None:
+async def _handle_command(
+    cmd: str, args: str, session_id: str
+) -> list[dict[str, Any]] | None:
     """Handle a slash command. Returns message list, or None if not a command."""
     if cmd == "help":
         return _msg(_HELP_TEXT)
@@ -172,7 +237,9 @@ async def _handle_command(cmd: str, args: str, session_id: str) -> list[dict[str
     if cmd == "think":
         level = args.strip().lower()
         if level not in _THINK_LEVELS:
-            return _msg(f"Invalid level. Use one of: {', '.join(sorted(_THINK_LEVELS))}")
+            return _msg(
+                f"Invalid level. Use one of: {', '.join(sorted(_THINK_LEVELS))}"
+            )
         val = None if level == "off" else level
         _agent.provider.generation.reasoning_effort = val
         return _msg(f"Reasoning effort set to **{level}**.")
@@ -185,6 +252,7 @@ async def _handle_command(cmd: str, args: str, session_id: str) -> list[dict[str
 
     if cmd == "audit":
         from audit import audit_logger
+
         n = 20
         if args.strip().isdigit():
             n = int(args.strip())
@@ -197,7 +265,9 @@ async def _handle_command(cmd: str, args: str, session_id: str) -> list[dict[str
             lines.append(
                 f"- `{e['ts'][:19]}` **{e['tool']}** ({e['duration_ms']}ms) [{status}] — {e.get('result_summary', '')[:80]}"
             )
-        return _msg(f"**Recent audit log ({len(entries)} entries):**\n" + "\n".join(lines))
+        return _msg(
+            f"**Recent audit log ({len(entries)} entries):**\n" + "\n".join(lines)
+        )
 
     if cmd == "mcp":
         return await _handle_mcp_command(args)
@@ -232,7 +302,9 @@ async def _handle_mcp_command(args: str) -> list[dict[str, Any]]:
             # Find tools registered from this server
             prefix = f"mcp_{name}_"
             tools = [t for t in _agent.tools.tool_names if t.startswith(prefix)]
-            tool_list = ", ".join(f"`{t}`" for t in tools) if tools else "(no tools connected)"
+            tool_list = (
+                ", ".join(f"`{t}`" for t in tools) if tools else "(no tools connected)"
+            )
             lines.append(f"**{name}** ({stype}): {tool_list}")
         return _msg("**MCP Servers:**\n" + "\n".join(lines))
 
@@ -240,7 +312,9 @@ async def _handle_mcp_command(args: str) -> list[dict[str, Any]]:
         # /mcp add <name> {"command": "...", "args": [...]}
         add_parts = rest.split(None, 1)
         if len(add_parts) < 2:
-            return _msg("Usage: `/mcp add <name> <json-config>`\n\nExample: `/mcp add myserver {\"command\": \"npx\", \"args\": [\"@org/mcp-server\"]}`")
+            return _msg(
+                'Usage: `/mcp add <name> <json-config>`\n\nExample: `/mcp add myserver {"command": "npx", "args": ["@org/mcp-server"]}`'
+            )
         name, config_json = add_parts
         try:
             raw = json.loads(config_json)
@@ -249,6 +323,7 @@ async def _handle_mcp_command(args: str) -> list[dict[str, Any]]:
 
         # Build MCPServerConfig from raw dict
         from nanobot.config.schema import MCPServerConfig
+
         try:
             mcp_cfg = MCPServerConfig(**raw)
         except Exception as e:
@@ -261,6 +336,7 @@ async def _handle_mcp_command(args: str) -> list[dict[str, Any]]:
 
         # Connect the new server
         from nanobot.agent.tools.mcp import connect_mcp_servers
+
         try:
             await connect_mcp_servers({name: mcp_cfg}, _agent.tools, _agent._mcp_stack)
         except Exception as e:
@@ -271,7 +347,9 @@ async def _handle_mcp_command(args: str) -> list[dict[str, Any]]:
         _persist_mcp_config()
 
         new_tools = [t for t in _agent.tools.tool_names if t.startswith(f"mcp_{name}_")]
-        tool_list = ", ".join(f"`{t}`" for t in new_tools) if new_tools else "(no tools)"
+        tool_list = (
+            ", ".join(f"`{t}`" for t in new_tools) if new_tools else "(no tools)"
+        )
         return _msg(f"Added MCP server **{name}**. Tools: {tool_list}")
 
     if subcmd == "remove":
@@ -294,7 +372,9 @@ async def _handle_mcp_command(args: str) -> list[dict[str, Any]]:
         removed = ", ".join(f"`{t}`" for t in to_remove) if to_remove else "(none)"
         return _msg(f"Removed MCP server **{name}**. Unregistered tools: {removed}")
 
-    return _msg("Unknown subcommand. Use `/mcp`, `/mcp add <name> <json>`, or `/mcp remove <name>`.")
+    return _msg(
+        "Unknown subcommand. Use `/mcp`, `/mcp add <name> <json>`, or `/mcp remove <name>`."
+    )
 
 
 def _persist_mcp_config():
@@ -333,6 +413,7 @@ def _persist_mcp_config():
 # /beads — quick access to beads issue tracker
 # ---------------------------------------------------------------------------
 
+
 async def _handle_beads_command(args: str) -> list[dict[str, Any]]:
     """Run a beads CLI command and return formatted output."""
     subcmd = args.strip() or "ready"
@@ -348,13 +429,15 @@ async def _handle_beads_command(args: str) -> list[dict[str, Any]]:
 
     try:
         proc = await asyncio.create_subprocess_exec(
-            "br", *cmd_parts, "--json",
+            "br",
+            *cmd_parts,
+            "--json",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             cwd="/sandbox",
         )
         stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=10)
-    except asyncio.TimeoutError:
+    except TimeoutError:
         return _msg("Beads command timed out.")
     except FileNotFoundError:
         return _msg("Error: `br` not installed.")
@@ -414,7 +497,9 @@ def _install_audit_wrapper():
                 session_id=session_id,
                 tool=name,
                 args=params,
-                result_summary=result[:200] if isinstance(result, str) else str(result)[:200],
+                result_summary=result[:200]
+                if isinstance(result, str)
+                else str(result)[:200],
                 duration_ms=duration_ms,
                 success=success,
             )
@@ -437,6 +522,7 @@ def _install_audit_wrapper():
 # ---------------------------------------------------------------------------
 # Chat function
 # ---------------------------------------------------------------------------
+
 
 def _strip_think(text: str) -> str:
     text = re.sub(r"<think>[\s\S]*?</think>", "", text)
@@ -466,17 +552,21 @@ async def chat(message: str, session_id: str) -> list[dict[str, Any]]:
             if not content:
                 return
             if tool_hint:
-                progress_messages.append({
-                    "role": "assistant",
-                    "metadata": {"title": f"🔧 {content}"},
-                    "content": "",
-                })
+                progress_messages.append(
+                    {
+                        "role": "assistant",
+                        "metadata": {"title": f"🔧 {content}"},
+                        "content": "",
+                    }
+                )
             else:
-                progress_messages.append({
-                    "role": "assistant",
-                    "metadata": {"title": "💭 Thinking"},
-                    "content": content,
-                })
+                progress_messages.append(
+                    {
+                        "role": "assistant",
+                        "metadata": {"title": "💭 Thinking"},
+                        "content": content,
+                    }
+                )
 
         response = await _agent.process_direct(
             content=message,
@@ -495,6 +585,7 @@ async def chat(message: str, session_id: str) -> list[dict[str, Any]]:
 # ---------------------------------------------------------------------------
 # Entrypoint
 # ---------------------------------------------------------------------------
+
 
 def _build_settings_callbacks() -> dict:
     """Build callbacks for the settings sidebar."""
@@ -555,10 +646,13 @@ def _build_settings_callbacks() -> dict:
         # Connect (async in sync context)
         if _agent._mcp_servers:
             from nanobot.agent.tools.mcp import connect_mcp_servers
+
             try:
-                asyncio.run(connect_mcp_servers(
-                    _agent._mcp_servers, _agent.tools, _agent._mcp_stack
-                ))
+                asyncio.run(
+                    connect_mcp_servers(
+                        _agent._mcp_servers, _agent.tools, _agent._mcp_stack
+                    )
+                )
             except Exception as e:
                 errors.append(f"Connection error: {e}")
 
@@ -590,7 +684,9 @@ def _build_settings_callbacks() -> dict:
 
     def get_model_info() -> str:
         model = _agent.model or "unknown"
-        effort = getattr(_agent.provider.generation, "reasoning_effort", None) or "default"
+        effort = (
+            getattr(_agent.provider.generation, "reasoning_effort", None) or "default"
+        )
         return f"**Model:** `{model}`\n\n**Reasoning:** {effort}"
 
     def get_provider_choices() -> list[str]:
@@ -601,21 +697,36 @@ def _build_settings_callbacks() -> dict:
             detected = _detect_vllm_model(api_base)
             label = detected or "local vLLM"
             choices.append(f"local: {label}")
-        # Offer Claude models if credentials available
+        # Offer Claude models if any credentials available (API key or OAuth)
+        import json
         import os
-        if os.environ.get("ANTHROPIC_API_KEY"):
-            choices.extend([
-                "claude: claude-sonnet-4-6",
-                "claude: claude-opus-4-6",
-                "claude: claude-haiku-4-5",
-            ])
+
+        has_claude = bool(os.environ.get("ANTHROPIC_API_KEY"))
+        if not has_claude:
+            try:
+                with open(os.path.expanduser("~/.claude/.credentials.json")) as f:
+                    creds = json.load(f)
+                has_claude = bool(creds.get("claudeAiOauth", {}).get("accessToken"))
+            except (FileNotFoundError, json.JSONDecodeError):
+                pass
+        if has_claude:
+            choices.extend(
+                [
+                    "claude: claude-sonnet-4-6",
+                    "claude: claude-opus-4-6",
+                    "claude: claude-haiku-4-5",
+                ]
+            )
         return choices
 
     def get_current_provider() -> str:
         model = _agent.model or ""
-        if _agent.provider.api_base and "localhost" not in str(_agent.provider.api_base or "") and "host.docker" not in str(_agent.provider.api_base or ""):
-            return f"claude: {model}"
-        return f"local: {model}"
+        # Strip litellm routing prefix for display
+        display_model = model.replace("openai/", "")
+        # If model starts with claude-, it's a Claude model via CLIProxyAPI
+        if display_model.startswith("claude-"):
+            return f"claude: {display_model}"
+        return f"local: {display_model}"
 
     def switch_provider(choice: str) -> str:
         if not choice:
@@ -637,6 +748,7 @@ def _build_settings_callbacks() -> dict:
             provider_cls = LiteLLMProvider
             if "omnicoder" in model.lower():
                 from nanobot.providers.omnicoder_provider import OmniCoderProvider
+
                 provider_cls = OmniCoderProvider
 
             p = _config.get_provider(_config.agents.defaults.model)
@@ -648,16 +760,29 @@ def _build_settings_callbacks() -> dict:
                 provider_name="vllm",
             )
         elif provider_type == "claude":
+            import json
             import os
-            api_key = os.environ.get("ANTHROPIC_API_KEY")
-            if not api_key:
-                return "**Error:** No ANTHROPIC_API_KEY available."
 
+            api_key = os.environ.get("ANTHROPIC_API_KEY") or ""
+            # Fallback: read OAuth token from credentials file (Mac keychain path)
+            if not api_key:
+                try:
+                    with open(os.path.expanduser("~/.claude/.credentials.json")) as f:
+                        creds = json.load(f)
+                    api_key = creds.get("claudeAiOauth", {}).get("accessToken", "")
+                except (FileNotFoundError, json.JSONDecodeError):
+                    pass
+            if not api_key:
+                return "**Error:** No Anthropic credentials found."
+
+            # Route through CLIProxyAPI (localhost:8317) which handles OAuth
+            # CLIProxyAPI provides OpenAI-compatible endpoints
+            # openai/ prefix tells litellm to use OpenAI protocol (not Anthropic)
             provider = LiteLLMProvider(
-                api_key=api_key,
-                api_base=None,
-                default_model=f"anthropic/{model_name}",
-                provider_name="anthropic",
+                api_key="protoclaw-internal",
+                api_base="http://127.0.0.1:8317/v1",
+                default_model=f"openai/{model_name}",
+                provider_name="openai",
             )
         else:
             return f"**Error:** Unknown provider type: {provider_type}"
@@ -675,7 +800,8 @@ def _build_settings_callbacks() -> dict:
         return f"**Switched to:** `{provider.default_model}`"
 
     def get_subtitle() -> str:
-        return f"**🦀 protoClaw** &nbsp; `{_agent.model}`"
+        display_model = (_agent.model or "").replace("openai/", "")
+        return f"**protoClaw** &nbsp; `{display_model}`"
 
     return {
         "get_mcp_config": get_mcp_config,
@@ -710,34 +836,95 @@ def _main():
 
     # Register browser tool
     from tools.browser import BrowserTool
+
     _agent.tools.register(BrowserTool())
 
     # Register beads issue tracker
     from tools.beads import BeadsTool
+
     _agent.tools.register(BeadsTool())
 
     # Register vector memory (silent if Ollama unavailable)
     from tools.vector_memory import VectorMemory
+
     _vector_memory = VectorMemory()
     _agent.tools.register(_vector_memory.as_tool())
 
-    # Register Phone a Friend tool (replaces standalone Claude tool)
+    # Register Phone a Friend tool (multi-provider LLM fallback — always available)
     from tools.phone_a_friend import PhoneAFriendTool
+
     _agent.tools.register(PhoneAFriendTool())
 
-    app = create_chat_app(
+    # Register Claude Code CLI tool (rate-limited, only if credentials exist)
+    from tools.claude import ClaudeTool, is_claude_available
+
+    if is_claude_available():
+        _agent.tools.register(ClaudeTool())
+    else:
+        print("Claude tool: skipped (no credentials found)")
+
+    # Run MCP startup health check
+    asyncio.run(_startup_mcp_health_check())
+
+    blocks = create_chat_app(
         chat_fn=chat,
-        title="🦀 protoClaw",
-        subtitle=f"`{_agent.model}`",
+        title="protoClaw",
+        subtitle="",
         placeholder="Ask protoClaw anything...",
         settings=_build_settings_callbacks(),
+        pwa=True,
     )
 
-    app.launch(
-        server_name="0.0.0.0",
-        server_port=args.port,
-        share=args.share,
-    )
+    # ---------------------------------------------------------------------------
+    # PWA static file serving
+    # Mount Gradio on a FastAPI app so we can serve /manifest.json, /sw.js,
+    # and /static/** at clean root-level URLs as required by the PWA spec.
+    # ---------------------------------------------------------------------------
+    import gradio as gr
+    import uvicorn
+    from fastapi import FastAPI
+    from fastapi.responses import FileResponse
+    from fastapi.staticfiles import StaticFiles
+
+    static_dir = Path(__file__).parent / "static"
+
+    fastapi_app = FastAPI(title="protoClaw — protoLabs")
+
+    if static_dir.exists():
+        # Serve PWA manifest at root path (required by browsers for installation)
+        manifest_path = static_dir / "manifest.json"
+        if manifest_path.exists():
+
+            @fastapi_app.get("/manifest.json", include_in_schema=False)
+            async def _serve_manifest() -> FileResponse:
+                return FileResponse(
+                    str(manifest_path), media_type="application/manifest+json"
+                )
+
+        # Serve service worker at root path (scope must cover the whole origin)
+        sw_path = static_dir / "sw.js"
+        if sw_path.exists():
+
+            @fastapi_app.get("/sw.js", include_in_schema=False)
+            async def _serve_sw() -> FileResponse:
+                return FileResponse(
+                    str(sw_path),
+                    media_type="application/javascript",
+                    headers={"Service-Worker-Allowed": "/"},
+                )
+
+        # Serve /static/** for favicon and icons
+        fastapi_app.mount(
+            "/static",
+            StaticFiles(directory=str(static_dir)),
+            name="ava-static",
+        )
+
+    # Mount Gradio at root — PWA routes above take precedence
+    app = gr.mount_gradio_app(fastapi_app, blocks, path="/")
+
+    print(f"[protoClaw] Starting on http://0.0.0.0:{args.port}")
+    uvicorn.run(app, host="0.0.0.0", port=args.port)
 
 
 if __name__ == "__main__":
