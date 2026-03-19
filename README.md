@@ -49,9 +49,12 @@ Runs nanobot + OpenCode inside a hardened Docker container, connected to a local
 **Prerequisites:** Docker, vLLM serving OmniCoder-9B on port 8000.
 
 ```bash
-# Clone with submodule
+# Clone with submodule (required — nanobot is a git submodule)
 git clone --recurse-submodules https://github.com/protoLabsAI/protoClaw.git
 cd protoClaw
+
+# If you already cloned without --recurse-submodules:
+git submodule update --init --recursive
 
 # Build
 docker build -t protoclaw .
