@@ -15,6 +15,11 @@ cp /opt/protoclaw/config/opencode.json /home/sandbox/.config/opencode/opencode.j
 mkdir -p /sandbox
 cp /opt/protoclaw/config/SOUL.md /sandbox/SOUL.md
 
+# Initialize beads issue tracker if not already present
+if [ ! -d /sandbox/.beads ]; then
+    cd /sandbox && br init 2>/dev/null || true
+fi
+
 # Start OpenCode web UI in background on port 7866
 opencode web --port 7866 --hostname 0.0.0.0 &
 

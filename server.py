@@ -8,7 +8,9 @@ Usage:
 """
 
 import argparse
+import asyncio
 import contextvars
+import json
 import re
 import time
 from pathlib import Path
@@ -130,6 +132,10 @@ _HELP_TEXT = """\
 | `/model` | Show current model |
 | `/tools` | List registered tools |
 | `/audit [n]` | Show recent audit log entries |
+| `/mcp` | List connected MCP servers |
+| `/mcp add <name> <json>` | Add an MCP server at runtime |
+| `/mcp remove <name>` | Remove an MCP server |
+| `/beads [cmd]` | Quick beads issue tracker (list/ready/stats) |
 | `/help` | Show this help |
 """
 
@@ -194,7 +200,193 @@ async def _handle_command(cmd: str, args: str, session_id: str) -> list[dict[str
             )
         return _msg(f"**Recent audit log ({len(entries)} entries):**\n" + "\n".join(lines))
 
+    if cmd == "mcp":
+        return await _handle_mcp_command(args)
+
+    if cmd == "beads":
+        return await _handle_beads_command(args)
+
     return None
+
+
+# ---------------------------------------------------------------------------
+# /mcp subcommands — runtime MCP server management
+# ---------------------------------------------------------------------------
+
+_config_path: Path | None = None  # set in main
+
+
+async def _handle_mcp_command(args: str) -> list[dict[str, Any]]:
+    """Handle /mcp list|add|remove subcommands."""
+    parts = args.strip().split(None, 1)
+    subcmd = parts[0] if parts else ""
+    rest = parts[1] if len(parts) > 1 else ""
+
+    if not subcmd or subcmd == "list":
+        # List connected MCP servers and their tools
+        mcp_servers = _agent._mcp_servers or {}
+        if not mcp_servers:
+            return _msg("No MCP servers configured.")
+        lines = []
+        for name, cfg in mcp_servers.items():
+            stype = getattr(cfg, "type", None) or "auto"
+            # Find tools registered from this server
+            prefix = f"mcp_{name}_"
+            tools = [t for t in _agent.tools.tool_names if t.startswith(prefix)]
+            tool_list = ", ".join(f"`{t}`" for t in tools) if tools else "(no tools connected)"
+            lines.append(f"**{name}** ({stype}): {tool_list}")
+        return _msg("**MCP Servers:**\n" + "\n".join(lines))
+
+    if subcmd == "add":
+        # /mcp add <name> {"command": "...", "args": [...]}
+        add_parts = rest.split(None, 1)
+        if len(add_parts) < 2:
+            return _msg("Usage: `/mcp add <name> <json-config>`\n\nExample: `/mcp add myserver {\"command\": \"npx\", \"args\": [\"@org/mcp-server\"]}`")
+        name, config_json = add_parts
+        try:
+            raw = json.loads(config_json)
+        except json.JSONDecodeError as e:
+            return _msg(f"Invalid JSON: {e}")
+
+        # Build MCPServerConfig from raw dict
+        from nanobot.config.schema import MCPServerConfig
+        try:
+            mcp_cfg = MCPServerConfig(**raw)
+        except Exception as e:
+            return _msg(f"Invalid MCP config: {e}")
+
+        # Add to agent's MCP servers and connect
+        if _agent._mcp_servers is None:
+            _agent._mcp_servers = {}
+        _agent._mcp_servers[name] = mcp_cfg
+
+        # Connect the new server
+        from nanobot.agent.tools.mcp import connect_mcp_servers
+        try:
+            await connect_mcp_servers({name: mcp_cfg}, _agent.tools, _agent._mcp_stack)
+        except Exception as e:
+            _agent._mcp_servers.pop(name, None)
+            return _msg(f"Failed to connect `{name}`: {e}")
+
+        # Persist to config file
+        _persist_mcp_config()
+
+        new_tools = [t for t in _agent.tools.tool_names if t.startswith(f"mcp_{name}_")]
+        tool_list = ", ".join(f"`{t}`" for t in new_tools) if new_tools else "(no tools)"
+        return _msg(f"Added MCP server **{name}**. Tools: {tool_list}")
+
+    if subcmd == "remove":
+        name = rest.strip()
+        if not name:
+            return _msg("Usage: `/mcp remove <name>`")
+
+        if not _agent._mcp_servers or name not in _agent._mcp_servers:
+            return _msg(f"MCP server `{name}` not found.")
+
+        # Unregister tools from this server
+        prefix = f"mcp_{name}_"
+        to_remove = [t for t in _agent.tools.tool_names if t.startswith(prefix)]
+        for t in to_remove:
+            _agent.tools.unregister(t)
+
+        _agent._mcp_servers.pop(name)
+        _persist_mcp_config()
+
+        removed = ", ".join(f"`{t}`" for t in to_remove) if to_remove else "(none)"
+        return _msg(f"Removed MCP server **{name}**. Unregistered tools: {removed}")
+
+    return _msg("Unknown subcommand. Use `/mcp`, `/mcp add <name> <json>`, or `/mcp remove <name>`.")
+
+
+def _persist_mcp_config():
+    """Write current MCP server config back to the config JSON file."""
+    if not _config_path:
+        return
+    try:
+        config_data = json.loads(_config_path.read_text())
+        serialized = {}
+        for name, cfg in (_agent._mcp_servers or {}).items():
+            entry = {}
+            if cfg.type:
+                entry["type"] = cfg.type
+            if cfg.command:
+                entry["command"] = cfg.command
+            if cfg.args:
+                entry["args"] = cfg.args
+            if cfg.env:
+                entry["env"] = cfg.env
+            if cfg.url:
+                entry["url"] = cfg.url
+            if cfg.headers:
+                entry["headers"] = cfg.headers
+            if cfg.tool_timeout != 30:
+                entry["toolTimeout"] = cfg.tool_timeout
+            if cfg.enabled_tools != ["*"]:
+                entry["enabledTools"] = cfg.enabled_tools
+            serialized[name] = entry
+        config_data["tools"]["mcpServers"] = serialized
+        _config_path.write_text(json.dumps(config_data, indent=2) + "\n")
+    except Exception:
+        pass  # Non-critical — runtime state is authoritative
+
+
+# ---------------------------------------------------------------------------
+# /beads — quick access to beads issue tracker
+# ---------------------------------------------------------------------------
+
+async def _handle_beads_command(args: str) -> list[dict[str, Any]]:
+    """Run a beads CLI command and return formatted output."""
+    subcmd = args.strip() or "ready"
+
+    # Whitelist safe read-only commands for quick access
+    safe_cmds = {"list", "ready", "blocked", "stats", "stale"}
+    cmd_parts = subcmd.split()
+    if cmd_parts[0] not in safe_cmds:
+        return _msg(
+            f"Quick commands: {', '.join(sorted(safe_cmds))}.\n"
+            "For mutations (create/update/close), use the beads MCP tools directly."
+        )
+
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "br", *cmd_parts, "--json",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd="/sandbox",
+        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=10)
+    except asyncio.TimeoutError:
+        return _msg("Beads command timed out.")
+    except FileNotFoundError:
+        return _msg("Error: `br` not installed.")
+
+    if proc.returncode != 0:
+        err = stderr.decode(errors="replace").strip()
+        return _msg(f"Beads error: {err[:300]}")
+
+    raw = stdout.decode(errors="replace").strip()
+    if not raw:
+        return _msg("No results.")
+
+    # Format JSON output into readable markdown
+    try:
+        data = json.loads(raw)
+        if isinstance(data, list):
+            if not data:
+                return _msg("No issues found.")
+            lines = []
+            for issue in data[:20]:
+                status = issue.get("status", "?")
+                priority = issue.get("priority", "?")
+                title = issue.get("title", "untitled")
+                iid = issue.get("id", "?")
+                lines.append(f"- `{iid}` [{status}] P{priority} — {title}")
+            return _msg(f"**Beads ({len(data)} issues):**\n" + "\n".join(lines))
+        else:
+            # Stats or single object
+            return _msg(f"```json\n{json.dumps(data, indent=2)}\n```")
+    except json.JSONDecodeError:
+        return _msg(f"```\n{raw[:2000]}\n```")
 
 
 # ---------------------------------------------------------------------------
@@ -314,17 +506,26 @@ if __name__ == "__main__":
 
     _init_agent(args.config)
 
-    # Feature 2: Install audit logging wrapper
+    # Track config path for /mcp persistence
+    global _config_path
+    if args.config:
+        _config_path = Path(args.config).expanduser().resolve()
+
+    # Install audit logging wrapper
     _install_audit_wrapper()
 
-    # Feature 3: Register browser tool
+    # Register browser tool
     from tools.browser import BrowserTool
     _agent.tools.register(BrowserTool())
 
-    # Feature 4: Register vector memory (silent if Ollama unavailable)
+    # Register vector memory (silent if Ollama unavailable)
     from tools.vector_memory import VectorMemory
     _vector_memory = VectorMemory()
     _agent.tools.register(_vector_memory.as_tool())
+
+    # Register Claude Code tool (silent if no API key)
+    from tools.claude import ClaudeTool
+    _agent.tools.register(ClaudeTool())
 
     model_name = _agent.model
 

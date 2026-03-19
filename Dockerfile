@@ -14,11 +14,19 @@ RUN curl -fsSL "https://github.com/anomalyco/opencode/releases/download/${OPENCO
     | tar xz -C /usr/local/bin \
     && chmod +x /usr/local/bin/opencode
 
-# Browser tool: Node.js + agent-browser + Chromium
+# Node.js (needed for agent-browser + Claude Code CLI)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     nodejs npm \
     && rm -rf /var/lib/apt/lists/*
+
+# Browser tool: agent-browser + Chromium
 RUN npm install -g agent-browser && agent-browser install --with-deps
+
+# Claude Code CLI (headless mode for AI-assisted tasks)
+RUN npm install -g @anthropic-ai/claude-code
+
+# Beads issue tracker (Rust binary)
+RUN curl -fsSL "https://raw.githubusercontent.com/Dicklesworthstone/beads_rust/main/install.sh?$(date +%s)" | bash
 
 # Install nanobot from submodule
 COPY nanobot/ /opt/nanobot/

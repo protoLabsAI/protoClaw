@@ -27,6 +27,7 @@ services:
     volumes:
       - protoclaw-vectors:/sandbox/memory
       - protoclaw-audit:/sandbox/audit
+      - protoclaw-beads:/sandbox/.beads
 
     # Expose Gradio UI
     ports:
@@ -48,6 +49,7 @@ services:
 
     environment:
       - HOME=/home/sandbox
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
 
     stdin_open: true
     tty: true
@@ -57,3 +59,4 @@ services:
 volumes:
   protoclaw-vectors:
   protoclaw-audit:
+  protoclaw-beads:
