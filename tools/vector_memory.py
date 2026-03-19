@@ -125,9 +125,8 @@ class VectorMemory:
             SELECT m.content, m.source, m.session_id, m.created_at, v.distance
             FROM memory_vec v
             JOIN memories m ON m.id = v.rowid
-            WHERE v.embedding MATCH ?
+            WHERE v.embedding MATCH ? AND k = ?
             ORDER BY v.distance
-            LIMIT ?
             """,
             (vec_bytes, k),
         ).fetchall()
