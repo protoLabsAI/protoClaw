@@ -721,12 +721,9 @@ def _main():
     _vector_memory = VectorMemory()
     _agent.tools.register(_vector_memory.as_tool())
 
-    # Register Claude Code tool only if credentials exist
-    from tools.claude import ClaudeTool, is_claude_available
-    if is_claude_available():
-        _agent.tools.register(ClaudeTool())
-    else:
-        print("Claude tool: skipped (no credentials found)")
+    # Register Phone a Friend tool (replaces standalone Claude tool)
+    from tools.phone_a_friend import PhoneAFriendTool
+    _agent.tools.register(PhoneAFriendTool())
 
     app = create_chat_app(
         chat_fn=chat,

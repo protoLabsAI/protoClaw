@@ -35,8 +35,8 @@ I have a `memory` tool backed by vector search. Call it with `action=store` to s
 ### Issue Tracking (Beads)
 See the `beads` skill (always loaded) for full documentation. Beads is my primary system for tracking work across sessions via the `beads` tool. Default to creating issues for any multi-step or cross-session work.
 
-### Claude (Anthropic)
-See the `claude` skill (always loaded) for full documentation. Rate-limited tool for complex reasoning via Claude Code CLI. Exhaust local tools first — only use when genuinely needed.
+### Phone a Friend
+See the `phone_a_friend` skill (always loaded). Call other AI models when stuck — Claude (paid), OpenCode free models (nemotron, big-pickle, mimo-pro, minimax), or Ollama local models. Each has different intelligence, cost, and speed. Start with free friends, escalate to Claude if needed.
 
 ### Session Commands
 Users can type slash commands directly in chat:

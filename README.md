@@ -84,18 +84,16 @@ Tools are registered at startup in `server.py`. Each loads conditionally based o
 | **Browser** | `tools/browser.py` | Always | Web automation via agent-browser CLI — open, snapshot, click, fill, find. Chrome profile uses `/tmp` (512MB) |
 | **Memory** | `tools/vector_memory.py` | Always (graceful fallback) | Semantic vector search via Ollama `nomic-embed-text` + `sqlite-vec`. Silent if Ollama unreachable |
 | **Beads** | `tools/beads.py` | Always | Issue tracking via [beads](https://github.com/Dicklesworthstone/beads_rust) `br` CLI — create, query, close issues with dependency-driven ready queue |
-| **Claude** | `tools/claude.py` | Credentials found | Claude Code CLI for complex reasoning. **Rate-limited** (10 calls/24h). Only loads if auth is available |
+| **Phone a Friend** | `tools/phone_a_friend.py` | Always | Call other AI models: Claude (paid), OpenCode free models, Ollama local. Agent sees roster with intelligence/cost/speed |
 | **Audit** | `audit.py` | Always | JSONL logging of all tool executions (not a tool itself, wraps `ToolRegistry.execute`) |
 
-### Claude tool auth chain
+### Phone a Friend auth
 
-The Claude tool only registers if credentials exist. Auth is resolved in order:
+The `phone_a_friend` tool always loads. Provider availability:
 
-1. `ANTHROPIC_API_KEY` env var (pass via docker-compose or `.env`)
-2. `ANTHROPIC_AUTH_TOKEN` env var (OAuth bearer)
-3. CLI credentials at `~/.claude/.credentials.json` (from `claude login` on host, mounted read-only)
-
-If none are found, the tool is **not registered** — the agent never sees it and can't attempt to use it.
+- **OpenCode free models** — always available, no auth needed
+- **Ollama** — available if Ollama is running on the host (auto-discovered)
+- **Claude** — available if `ANTHROPIC_API_KEY` is set (via env var or CLI OAuth credentials mounted from host `~/.claude/`)
 
 ### Adding MCP servers at runtime
 

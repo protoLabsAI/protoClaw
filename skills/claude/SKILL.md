@@ -1,66 +1,62 @@
 ---
-name: claude
-description: Invoke Claude (Anthropic) for complex reasoning, code review, and self-improvement tasks.
+name: phone_a_friend
+description: Call another AI model for help when stuck — multiple providers with different capabilities and costs.
 always: true
 ---
 
-# Claude Tool
+# Phone a Friend
 
-You have a `claude` tool that invokes Claude Code CLI (Anthropic) as a subprocess. This gives you access to a more capable model for tasks beyond your local LLM.
-
-## Budget
-
-This tool is **rate-limited** — you have a fixed number of calls per 24-hour window (default: 10). The remaining budget is shown in the tool description every time your tools are loaded. Treat each call as expensive.
+You have a `phone_a_friend` tool that lets you call other AI models when you need help. Each friend has different strengths, costs, and speed. The available friends are listed in the tool description (it updates dynamically).
 
 ## When to Use
 
-Use the `claude` tool ONLY when:
-- The task genuinely requires stronger reasoning than you can provide
-- You need deep code review or architectural analysis
-- You're stuck and have exhausted your own tools and reasoning
-- The user explicitly asks you to use Claude
-- Self-improvement: analyzing your own behavior, refining your approach
+Use `phone_a_friend` when:
+- You're stuck on a problem and need a different perspective
+- The task requires deeper reasoning than you can provide alone
+- You need to plan a complex multi-step approach
+- You need code review or architectural analysis
+- Claude is rate-limited and you need *any* outside help
+- The user explicitly asks you to get a second opinion
 
 ## When NOT to Use
 
-Do NOT use the `claude` tool for:
-- Simple questions you can answer yourself
-- File operations, searches, or web lookups (use your local tools)
-- Tasks where your local tools are sufficient
-- Casual conversation or formatting
+Do NOT phone a friend for:
+- Tasks you can handle yourself with local tools
+- Simple file operations, searches, or web lookups
+- Questions you already know the answer to
 
-**Exhaust local tools first.** Read files, search code, run commands — if you can solve it with your own tools, do that instead.
+**Exhaust your own tools first.** Read files, search code, run commands. Only phone a friend when you genuinely need outside reasoning.
 
-## How to Use
+## Choosing the Right Friend
 
-```
-Tool: claude
-Parameters:
-  prompt (required): Clear, specific task description. Be detailed — you're paying for this call.
-  max_turns (optional): Max agentic iterations (default 5, max 20). Keep low unless the task is complex.
-  allowed_tools (optional): Comma-separated tools Claude can use (default: Read,Glob,Grep,Bash). Use "all" for full access.
-```
+**Need deep reasoning or complex analysis?**
+→ `claude-sonnet` or `claude-opus` (paid, rate-limited, expert-level)
+
+**Claude unavailable or rate-limited? Need general reasoning?**
+→ `nemotron` or `big-pickle` (free, strong reasoning)
+
+**Need quick code help?**
+→ `mimo-pro` (free, fast, code-focused)
+
+**Need general writing or summarization?**
+→ `minimax` (free, fast)
+
+**Want fast local inference?**
+→ `ollama-*` friends (free, runs on host GPU, no network latency)
 
 ## Best Practices
 
-1. **Be specific in your prompt.** Vague prompts waste the call. Include file paths, context, and what you want back.
-2. **Front-load context.** Read relevant files yourself first, then include key snippets in the prompt so Claude doesn't spend turns re-reading.
-3. **Keep max_turns low.** Most tasks need 3-5 turns. Only increase for complex multi-file analysis.
-4. **Use restricted tools.** Default `Read,Glob,Grep,Bash` is usually enough. Only pass `all` if Claude needs to edit files.
-5. **One call, one task.** Don't try to pack multiple unrelated tasks into one prompt.
+1. **Pick by task, not by habit.** Don't always call the same friend — match the friend to the problem.
+2. **Be specific in your prompt.** Include context, file contents, and what you want back.
+3. **Start free, escalate if needed.** Try a free friend first. If the answer isn't good enough, then try Claude.
+4. **One call, one task.** Don't pack multiple unrelated questions into one prompt.
+5. **Include what you've tried.** Tell your friend what you already know and what didn't work.
 
-## Example Prompts
+## Example
 
-Good:
 ```
-"Review /sandbox/server.py for security vulnerabilities. Focus on the chat() function and any injection risks in slash command parsing. Return a list of findings with severity and suggested fixes."
+phone_a_friend(
+    friend="nemotron",
+    prompt="I need to implement a rate limiter with a sliding window in Python. Requirements: thread-safe, configurable limit and window, track usage per key. Give me a clean implementation."
+)
 ```
-
-Bad:
-```
-"Look at my code and tell me if it's good"
-```
-
-## Availability
-
-The claude tool only loads if credentials are available (API key or CLI OAuth). If you don't see it in `/tools`, credentials are not configured. Do not attempt to call it if it's not listed.
