@@ -4,6 +4,14 @@
 # Create dirs inside tmpfs home (tmpfs wipes everything)
 mkdir -p /home/sandbox/.nanobot /home/sandbox/.config/opencode /home/sandbox/.local
 
+# Copy host Claude credentials if mounted (for CLI OAuth fallback)
+# Can't symlink because tmpfs at /home/sandbox is created after bind mounts
+if [ -f /opt/claude-creds/.credentials.json ]; then
+    mkdir -p /home/sandbox/.claude
+    cp /opt/claude-creds/.credentials.json /home/sandbox/.claude/.credentials.json
+    chmod 600 /home/sandbox/.claude/.credentials.json
+fi
+
 # Ensure persistent volume dirs exist with correct ownership
 mkdir -p /sandbox/audit /sandbox/memory
 

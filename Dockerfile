@@ -5,8 +5,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git curl ca-certificates build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Create non-root sandbox user
-RUN useradd -m -s /bin/bash sandbox
+# Create non-root sandbox user (uid matches host user for bind mount perms)
+ARG SANDBOX_UID=1001
+RUN useradd -m -s /bin/bash -u ${SANDBOX_UID} sandbox
 
 # Install OpenCode CLI
 ARG OPENCODE_VERSION=v1.2.27

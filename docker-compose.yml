@@ -18,10 +18,10 @@ services:
 
     # Writable mounts (tmpfs = ephemeral, wiped on restart)
     tmpfs:
-      - /tmp:size=512M,uid=1000,gid=1000
+      - /tmp:size=512M,uid=1001,gid=1001
       - /run:size=64M
-      - /sandbox:size=256M,uid=1000,gid=1000
-      - /home/sandbox:size=128M,uid=1000,gid=1000
+      - /sandbox:size=256M,uid=1001,gid=1001
+      - /home/sandbox:size=128M,uid=1001,gid=1001
 
     # Persistent volumes
     volumes:
@@ -29,7 +29,8 @@ services:
       - protoclaw-audit:/sandbox/audit
       - protoclaw-beads:/sandbox/.beads
       # Mount host Claude credentials for CLI OAuth fallback (read-only)
-      - ${HOME}/.claude:/home/sandbox/.claude:ro
+      # Mounted to /opt/claude-creds (not /home/sandbox) because tmpfs overwrites /home/sandbox
+      - ${HOME}/.claude:/opt/claude-creds:ro
 
     # Expose Gradio UI
     ports:
