@@ -26,8 +26,11 @@ RUN npm install -g agent-browser && agent-browser install --with-deps
 # Claude Code CLI (headless mode for AI-assisted tasks)
 RUN npm install -g @anthropic-ai/claude-code
 
-# Beads issue tracker (Rust binary)
-RUN curl -fsSL "https://raw.githubusercontent.com/Dicklesworthstone/beads_rust/main/install.sh?$(date +%s)" | bash
+# Beads issue tracker (pre-built binary)
+ARG BEADS_VERSION=0.1.29
+RUN curl -fsSL "https://github.com/Dicklesworthstone/beads_rust/releases/download/v${BEADS_VERSION}/br-${BEADS_VERSION}-linux_amd64.tar.gz" \
+    | tar xz -C /usr/local/bin \
+    && chmod +x /usr/local/bin/br
 
 # Install nanobot from submodule
 COPY nanobot/ /opt/nanobot/
