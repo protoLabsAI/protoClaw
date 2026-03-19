@@ -87,11 +87,11 @@ def create_chat_app(
         with gr.Blocks(title=title.replace("*", "").strip()) as app:
             session_id = gr.State("default")
 
-            header = f"**{title}**"
+            header_text = f"**{title}**"
             if subtitle:
-                header += f" &nbsp; {subtitle}"
+                header_text += f" &nbsp; {subtitle}"
 
-            gr.Markdown(header)
+            header_md = gr.Markdown(header_text)
 
             chatbot = gr.Chatbot(
                 height=chat_height,
@@ -168,6 +168,9 @@ def create_chat_app(
                         def switch_provider(choice):
                             return settings["switch_provider"](choice)
 
+                        def load_subtitle():
+                            return settings["get_subtitle"]()
+
                         # Load initial state
                         app.load(fn=load_mcp_config, outputs=[mcp_editor])
                         app.load(fn=load_mcp_status, outputs=[mcp_status])
@@ -190,6 +193,9 @@ def create_chat_app(
                         ).then(
                             fn=load_model,
                             outputs=[model_display],
+                        ).then(
+                            fn=load_subtitle,
+                            outputs=[header_md],
                         )
 
                         # Save MCP config

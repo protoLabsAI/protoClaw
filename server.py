@@ -674,6 +674,9 @@ def _build_settings_callbacks() -> dict:
         _agent.model = provider.default_model
         return f"**Switched to:** `{provider.default_model}`"
 
+    def get_subtitle() -> str:
+        return f"**🦀 protoClaw** &nbsp; `{_agent.model}`"
+
     return {
         "get_mcp_config": get_mcp_config,
         "save_mcp_config": save_mcp_config,
@@ -683,6 +686,7 @@ def _build_settings_callbacks() -> dict:
         "get_provider_choices": get_provider_choices,
         "get_current_provider": get_current_provider,
         "switch_provider": switch_provider,
+        "get_subtitle": get_subtitle,
     }
 
 
@@ -724,12 +728,10 @@ def _main():
     else:
         print("Claude tool: skipped (no credentials found)")
 
-    model_name = _agent.model
-
     app = create_chat_app(
         chat_fn=chat,
         title="🦀 protoClaw",
-        subtitle=f"`{model_name}` · sandboxed agent",
+        subtitle=f"`{_agent.model}`",
         placeholder="Ask protoClaw anything...",
         settings=_build_settings_callbacks(),
     )
