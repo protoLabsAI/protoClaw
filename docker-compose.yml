@@ -28,18 +28,22 @@ services:
       - protoclaw-vectors:/sandbox/memory
       - protoclaw-audit:/sandbox/audit
       - protoclaw-beads:/opt/.beads
+      - protoclaw-cliproxy:/opt/.cliproxy
       # Mount host Claude credentials for CLI OAuth fallback (read-only)
       # Mounted to /opt/claude-creds (not /home/sandbox) because tmpfs overwrites /home/sandbox
       - ${HOME}/.claude:/opt/claude-creds:ro
 
-    # Expose Gradio UI
+    # Expose Gradio UI + CLIProxyAPI (for initial OAuth login)
     ports:
-      - "7865:7865"   # protoClaw Gradio UI
-      - "7866:7866"   # OpenCode web UI
+      - "7865:7865" # protoClaw Gradio UI
+      - "7866:7866" # OpenCode web UI
+      - "8317:8317" # CLIProxyAPI (OAuth login + OpenAI-compatible API)
+      - "54545:54545" # CLIProxyAPI OAuth callback (needed for login flows)
 
     # Network: host vLLM access
     extra_hosts:
       - "host.docker.internal:host-gateway"
+      - "protolabs-1:100.109.43.57"
 
     # Resource limits
     deploy:
@@ -53,6 +57,9 @@ services:
     environment:
       - HOME=/home/sandbox
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      # macOS: extract with ./scripts/get-claude-token.sh
+      # Writes OAuth tokens to ~/.claude/.credentials.json in container
+      - CLAUDE_OAUTH_CREDENTIALS=${CLAUDE_OAUTH_CREDENTIALS:-}
 
     stdin_open: true
     tty: true
@@ -63,3 +70,4 @@ volumes:
   protoclaw-vectors:
   protoclaw-audit:
   protoclaw-beads:
+  protoclaw-cliproxy:
