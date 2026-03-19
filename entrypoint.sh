@@ -69,9 +69,35 @@ fi
 
 # Start CLIProxyAPI in background (OpenAI-compatible proxy for Claude OAuth)
 # OAuth tokens persist in /opt/.cliproxy volume
-# First run: visit http://localhost:8317 to authenticate via browser
 mkdir -p /opt/.cliproxy
 cp /opt/protoclaw/config/cliproxy-config.yaml /opt/.cliproxy/config.yaml
+
+# Seed CLIProxyAPI config with Claude OAuth token
+# The -claude-login flow has issues persisting auth files on read-only rootfs (Linux),
+# so we inject the OAuth token directly into the config via claude-api-keys.
+# This registers as a "Claude API key" (not a file-based auth entry).
+if [ -f /home/sandbox/.claude/.credentials.json ]; then
+    python3 -c "
+import json
+import yaml  # PyYAML installed via pip
+
+with open('/home/sandbox/.claude/.credentials.json') as f:
+    creds = json.load(f)
+token = creds.get('claudeAiOauth', {}).get('accessToken', '')
+
+with open('/opt/.cliproxy/config.yaml') as f:
+    cfg = yaml.safe_load(f)
+
+if token:
+    cfg['claude-api-key'] = [{'api-key': token}]
+    with open('/opt/.cliproxy/config.yaml', 'w') as f:
+        yaml.dump(cfg, f, default_flow_style=False)
+    print('[entrypoint] Injected Claude OAuth token into CLIProxyAPI config')
+else:
+    print('[entrypoint] No OAuth token found for CLIProxyAPI')
+" 2>/dev/null
+fi
+
 cli-proxy-api --config /opt/.cliproxy/config.yaml &
 echo "[entrypoint] CLIProxyAPI started on port 8317"
 
