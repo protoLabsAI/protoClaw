@@ -593,12 +593,96 @@ def _build_settings_callbacks() -> dict:
         effort = getattr(_agent.provider.generation, "reasoning_effort", None) or "default"
         return f"**Model:** `{model}`\n\n**Reasoning:** {effort}"
 
+    def get_provider_choices() -> list[str]:
+        choices = []
+        # Always offer local vLLM if configured
+        api_base = _config.get_api_base(_config.agents.defaults.model)
+        if api_base:
+            detected = _detect_vllm_model(api_base)
+            label = detected or "local vLLM"
+            choices.append(f"local: {label}")
+        # Offer Claude models if credentials available
+        import os
+        if os.environ.get("ANTHROPIC_API_KEY"):
+            choices.extend([
+                "claude: claude-sonnet-4-5-20250514",
+                "claude: claude-opus-4-5-20250514",
+                "claude: claude-haiku-4-5-20251001",
+            ])
+        return choices
+
+    def get_current_provider() -> str:
+        model = _agent.model or ""
+        if _agent.provider.api_base and "localhost" not in str(_agent.provider.api_base or "") and "host.docker" not in str(_agent.provider.api_base or ""):
+            return f"claude: {model}"
+        return f"local: {model}"
+
+    def switch_provider(choice: str) -> str:
+        if not choice:
+            return "No provider selected."
+
+        from nanobot.providers.base import GenerationSettings
+        from nanobot.providers.litellm_provider import LiteLLMProvider
+
+        parts = choice.split(": ", 1)
+        provider_type = parts[0]
+        model_name = parts[1] if len(parts) > 1 else ""
+
+        if provider_type == "local":
+            # Switch back to local vLLM
+            api_base = _config.get_api_base(_config.agents.defaults.model)
+            detected = _detect_vllm_model(api_base) if api_base else None
+            model = detected or model_name
+
+            provider_cls = LiteLLMProvider
+            if "omnicoder" in model.lower():
+                from nanobot.providers.omnicoder_provider import OmniCoderProvider
+                provider_cls = OmniCoderProvider
+
+            p = _config.get_provider(_config.agents.defaults.model)
+            provider = provider_cls(
+                api_key=p.api_key if p else None,
+                api_base=api_base,
+                default_model=model,
+                extra_headers=p.extra_headers if p else None,
+                provider_name="vllm",
+            )
+        elif provider_type == "claude":
+            import os
+            api_key = os.environ.get("ANTHROPIC_API_KEY")
+            if not api_key:
+                return "**Error:** No ANTHROPIC_API_KEY available."
+
+            provider = LiteLLMProvider(
+                api_key=api_key,
+                api_base=None,
+                default_model=f"anthropic/{model_name}",
+                provider_name="anthropic",
+            )
+        else:
+            return f"**Error:** Unknown provider type: {provider_type}"
+
+        # Preserve generation settings
+        old_gen = _agent.provider.generation
+        provider.generation = GenerationSettings(
+            temperature=old_gen.temperature,
+            max_tokens=old_gen.max_tokens,
+            reasoning_effort=old_gen.reasoning_effort,
+        )
+
+        _agent.provider = provider
+        _agent.model = provider.default_model
+        return f"**Switched to:** `{provider.default_model}`"
+
     return {
         "get_mcp_config": get_mcp_config,
         "save_mcp_config": save_mcp_config,
         "get_mcp_status": get_mcp_status,
         "get_tools_list": get_tools_list,
         "get_model_info": get_model_info,
+        "get_provider_choices": get_provider_choices,
+        "get_current_provider": get_current_provider,
+        "switch_provider": switch_provider,
     }
 
 

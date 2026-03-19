@@ -138,6 +138,12 @@ def create_chat_app(
 
                         with gr.Accordion("Model", open=False):
                             model_display = gr.Markdown("Loading...")
+                            provider_dropdown = gr.Dropdown(
+                                label="Provider",
+                                choices=[],
+                                interactive=True,
+                            )
+                            switch_status = gr.Markdown("")
                             refresh_model_btn = gr.Button("Refresh", size="sm")
 
                         # --- Settings callbacks ---
@@ -157,16 +163,37 @@ def create_chat_app(
                         def load_model():
                             return settings["get_model_info"]()
 
+                        def load_provider_choices():
+                            choices = settings["get_provider_choices"]()
+                            current = settings["get_current_provider"]()
+                            return gr.update(choices=choices, value=current)
+
+                        def switch_provider(choice):
+                            return settings["switch_provider"](choice)
+
                         # Load initial state
                         app.load(fn=load_mcp_config, outputs=[mcp_editor])
                         app.load(fn=load_mcp_status, outputs=[mcp_status])
                         app.load(fn=load_tools, outputs=[tools_display])
                         app.load(fn=load_model, outputs=[model_display])
+                        app.load(fn=load_provider_choices, outputs=[provider_dropdown])
 
                         # Refresh buttons
                         refresh_mcp_btn.click(fn=load_mcp_status, outputs=[mcp_status])
                         refresh_tools_btn.click(fn=load_tools, outputs=[tools_display])
-                        refresh_model_btn.click(fn=load_model, outputs=[model_display])
+                        refresh_model_btn.click(fn=load_model, outputs=[model_display]).then(
+                            fn=load_provider_choices, outputs=[provider_dropdown]
+                        )
+
+                        # Provider switch
+                        provider_dropdown.change(
+                            fn=switch_provider,
+                            inputs=[provider_dropdown],
+                            outputs=[switch_status],
+                        ).then(
+                            fn=load_model,
+                            outputs=[model_display],
+                        )
 
                         # Save MCP config
                         save_mcp_btn.click(
