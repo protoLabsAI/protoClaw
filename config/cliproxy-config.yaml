@@ -1,9 +1,10 @@
 # CLIProxyAPI config — OpenAI-compatible proxy for Claude Code OAuth
 # Docs: https://help.router-for.me/
 
-# Bind to localhost only (container-internal traffic)
-host: "127.0.0.1"
+# Bind to all interfaces (needed for OAuth callback via Tailscale)
+host: "0.0.0.0"
 port: 8317
+
 
 # Auth dir for OAuth tokens (persisted via volume)
 auth-dir: "/opt/.cliproxy"

@@ -56,6 +56,8 @@ COPY providers/ /opt/protoclaw/providers/
 COPY tools/ /opt/protoclaw/tools/
 COPY skills/ /opt/protoclaw/skills/
 COPY scripts/install-providers.py /opt/protoclaw/
+COPY scripts/claude-login.sh /opt/protoclaw/scripts/claude-login.sh
+RUN chmod +x /opt/protoclaw/scripts/*.sh
 COPY audit.py /opt/protoclaw/audit.py
 COPY chat_ui.py /opt/protoclaw/chat_ui.py
 COPY server.py /opt/protoclaw/server.py

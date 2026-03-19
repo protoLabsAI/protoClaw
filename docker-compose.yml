@@ -59,6 +59,7 @@ services:
       # macOS: extract with ./scripts/get-claude-token.sh
       # Writes OAuth tokens to ~/.claude/.credentials.json in container
       - CLAUDE_OAUTH_CREDENTIALS=${CLAUDE_OAUTH_CREDENTIALS:-}
+      - CLIPROXY_CALLBACK_HOST=${CLIPROXY_CALLBACK_HOST:-localhost}
 
     stdin_open: true
     tty: true
