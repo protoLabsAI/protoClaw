@@ -1,0 +1,11 @@
+.git
+nanobot/.git
+nanobot/tests
+nanobot/case
+nanobot/docs
+nanobot/*.png
+nanobot/CONTRIBUTING.md
+nanobot/COMMUNICATION.md
+nanobot/SECURITY.md
+**/__pycache__
+**/*.pyc

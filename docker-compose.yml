@@ -1,0 +1,48 @@
+services:
+  sandbox:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: protoclaw
+    hostname: sandbox
+
+    # --- NemoClaw-inspired security ---
+    security_opt:
+      - no-new-privileges:true
+      - seccomp=seccomp-profile.json
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_RAW
+    read_only: true
+
+    # Writable mounts (tmpfs = ephemeral, wiped on restart)
+    tmpfs:
+      - /tmp:size=512M,uid=1000,gid=1000
+      - /run:size=64M
+      - /sandbox:size=256M,uid=1000,gid=1000
+      - /home/sandbox/.nanobot:size=64M,uid=1000,gid=1000
+    volumes:
+      - ./config/nanobot-config.json:/home/sandbox/.nanobot/config.json:ro
+      - ./config/opencode.json:/home/sandbox/.config/opencode/opencode.json:ro
+
+    # Network: host vLLM access
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: "4"
+          memory: 4G
+        reservations:
+          memory: 512M
+
+    environment:
+      - HOME=/home/sandbox
+
+    stdin_open: true
+    tty: true
+
+    command: ["nanobot", "agent"]

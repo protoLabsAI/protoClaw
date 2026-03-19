@@ -1,0 +1,20 @@
+{
+  "provider": {
+    "vllm": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Local vLLM (OmniCoder-9B)",
+      "options": {
+        "baseURL": "http://host.docker.internal:8000/v1"
+      },
+      "models": {
+        "Tesslate/OmniCoder-9B": {
+          "name": "OmniCoder 9B",
+          "limit": {
+            "context": 262144,
+            "output": 4096
+          }
+        }
+      }
+    }
+  }
+}
