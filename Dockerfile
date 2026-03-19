@@ -15,10 +15,13 @@ RUN curl -fsSL "https://github.com/anomalyco/opencode/releases/download/${OPENCO
     | tar xz -C /usr/local/bin \
     && chmod +x /usr/local/bin/opencode
 
-# Node.js (needed for Claude Code CLI)
+# Node.js (needed for agent-browser + Claude Code CLI)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     nodejs npm \
     && rm -rf /var/lib/apt/lists/*
+
+# Browser tool: agent-browser + Chromium
+RUN npm install -g agent-browser && agent-browser install --with-deps
 
 # Claude Code CLI (headless mode for AI-assisted tasks)
 RUN npm install -g @anthropic-ai/claude-code

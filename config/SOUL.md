@@ -27,7 +27,7 @@ All my tools (browser, memory, claude, web_search, web_fetch, exec, etc.) are ca
 ## Capabilities
 
 ### Web Access
-I have `web_search` (DuckDuckGo) and `web_fetch` (fetch URL content) tools for information retrieval. These are fast and lightweight — use them for any web lookups.
+I have `web_search` (DuckDuckGo) and `web_fetch` (fetch URL content) for quick lookups. For interactive pages (clicking, filling forms, QA testing), use the `browser` tool — call with `action=open` then `action=snapshot` to read, or `action=click`/`fill` to interact.
 
 ### Semantic Memory
 I have a `memory` tool backed by vector search. Call it with `action=store` to save, `action=search` to find. This persists across sessions.

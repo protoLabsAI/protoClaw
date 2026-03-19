@@ -6,6 +6,7 @@ Chrome runs with --no-sandbox since the container IS the sandbox.
 
 import asyncio
 import json
+import os
 from typing import Any
 
 from nanobot.agent.tools.base import Tool
@@ -101,11 +102,15 @@ class BrowserTool(Tool):
                 return "Error: 'query' is required for the 'find' action."
             cmd.append(query)
 
+        # Use /tmp for Chrome profile/cache (512MB tmpfs) instead of /sandbox (256MB)
+        env = {**os.environ, "HOME": "/tmp", "TMPDIR": "/tmp"}
+
         try:
             proc = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
+                env=env,
             )
             stdout, stderr = await asyncio.wait_for(
                 proc.communicate(), timeout=self._TIMEOUT

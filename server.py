@@ -515,6 +515,10 @@ def _main():
     # Install audit logging wrapper
     _install_audit_wrapper()
 
+    # Register browser tool
+    from tools.browser import BrowserTool
+    _agent.tools.register(BrowserTool())
+
     # Register vector memory (silent if Ollama unavailable)
     from tools.vector_memory import VectorMemory
     _vector_memory = VectorMemory()
