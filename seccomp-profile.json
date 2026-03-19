@@ -19,7 +19,7 @@
         "mremap", "msync", "mincore", "madvise",
         "dup", "dup2", "dup3", "pause", "nanosleep",
         "getitimer", "alarm", "setitimer",
-        "getpid", "getppid", "getuid", "geteuid", "getgid", "getegid",
+        "getpid", "getppid", "getpgrp", "getpgid", "setpgid", "getuid", "geteuid", "getgid", "getegid", "getsid", "setsid",
         "getgroups", "getresuid", "getresgid",
         "sendfile", "socket", "connect", "accept", "accept4",
         "sendto", "recvfrom", "sendmsg", "recvmsg",

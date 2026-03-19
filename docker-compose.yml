@@ -21,14 +21,12 @@ services:
       - /tmp:size=512M,uid=1000,gid=1000
       - /run:size=64M
       - /sandbox:size=256M,uid=1000,gid=1000
-      - /home/sandbox/.nanobot:size=64M,uid=1000,gid=1000
-    volumes:
-      - ./config/nanobot-config.json:/home/sandbox/.nanobot/config.json:ro
-      - ./config/opencode.json:/home/sandbox/.config/opencode/opencode.json:ro
+      - /home/sandbox:size=128M,uid=1000,gid=1000
 
     # Expose Gradio UI
     ports:
-      - "7865:7865"
+      - "7865:7865"   # protoClaw Gradio UI
+      - "7866:7866"   # OpenCode web UI
 
     # Network: host vLLM access
     extra_hosts:
@@ -49,4 +47,4 @@ services:
     stdin_open: true
     tty: true
 
-    command: ["python", "/opt/protoclaw/server.py", "--config", "/home/sandbox/.nanobot/config.json"]
+    command: ["/opt/protoclaw/entrypoint.sh"]
