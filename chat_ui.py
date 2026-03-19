@@ -213,28 +213,43 @@ def create_chat_app(
 
             # --- Chat callbacks ---
 
-            def respond(message: str, history: list[dict], sid: str):
+            def add_user_message(message: str, history: list[dict]):
+                """Instantly render user message and clear input."""
                 if not message.strip():
-                    return "", history, sid
+                    return "", history, message
                 history.append({"role": "user", "content": message})
-                result = asyncio.run(chat_fn(message, sid))
+                return "", history, message
+
+            def get_response(history: list[dict], original_msg: str, sid: str):
+                """Call LLM and append response."""
+                if not original_msg.strip():
+                    return history, sid
+                result = asyncio.run(chat_fn(original_msg, sid))
                 # Handle command sentinels
                 for msg in result:
                     meta = msg.get("metadata", {})
                     if meta.get("_clear"):
-                        return "", [], sid
+                        return [], sid
                     if meta.get("_new"):
-                        return "", [], secrets.token_hex(4)
+                        return [], secrets.token_hex(4)
                 history.extend(result)
-                return "", history, sid
+                return history, sid
 
-            submit_args = dict(
-                fn=respond,
-                inputs=[txt, chatbot, session_id],
-                outputs=[txt, chatbot, session_id],
-            )
-            txt.submit(**submit_args)
-            send_btn.click(**submit_args)
+            # Hidden state to pass the original message between steps
+            pending_msg = gr.State("")
+
+            # Step 1: render user message instantly
+            # Step 2: call LLM (with loading indicator)
+            for trigger in [txt.submit, send_btn.click]:
+                trigger(
+                    fn=add_user_message,
+                    inputs=[txt, chatbot],
+                    outputs=[txt, chatbot, pending_msg],
+                ).then(
+                    fn=get_response,
+                    inputs=[chatbot, pending_msg, session_id],
+                    outputs=[chatbot, session_id],
+                )
 
             clear_btn.click(
                 fn=lambda: ([], "default"),
