@@ -18,7 +18,7 @@
   "providers": {
     "vllm": {
       "apiKey": "none",
-      "apiBase": "http://protolabs-1:8000/v1",
+      "apiBase": "http://host.docker.internal:8000/v1",
       "extraHeaders": null
     }
   },
@@ -45,10 +45,6 @@
       "pathAppend": ""
     },
     "restrictToWorkspace": true,
-    "mcpServers": {
-      "protolabs": {
-        "url": "http://host.docker.internal:18791/mcp"
-      }
-    }
+    "mcpServers": {}
   }
 }

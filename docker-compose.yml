@@ -43,7 +43,6 @@ services:
     # Network: host vLLM access
     extra_hosts:
       - "host.docker.internal:host-gateway"
-      - "protolabs-1:100.109.43.57"
 
     # Resource limits
     deploy:

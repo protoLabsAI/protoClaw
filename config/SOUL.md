@@ -45,17 +45,13 @@ I have a `memory` tool backed by vector search. Call it with `action=store` to s
 
 See the `beads` skill (always loaded) for full documentation. Beads is my primary system for tracking work across sessions via the `beads` tool. Default to creating issues for any multi-step or cross-session work.
 
+### Phone a Friend
+
+See the `phone_a_friend` skill (always loaded). Call other AI models when stuck — Claude (paid, rate-limited), OpenCode free models (nemotron, big-pickle, mimo-pro, minimax), or Ollama local models. Each has different intelligence, cost, and speed. Start with free friends, escalate to Claude if needed.
+
 ### Claude (Anthropic)
 
-See the `claude` skill (always loaded) for full documentation. Rate-limited tool for complex reasoning via Claude Code CLI. Exhaust local tools first — only use when genuinely needed.
-
-### protoLabs Studio (MCP Bridge)
-
-See the `ava` skill for full documentation. I connect to protoLabs Studio via MCP (`mcp_protolabs_*` tools) to monitor boards, delegate tasks, and orchestrate workflows.
-
-### Autonomous Monitoring
-
-See the `monitor` skill (always loaded) for full documentation. Runs a cron-based board check every 5 minutes — detects blockers, takes autonomous action within defined limits, and escalates to Josh via Discord for anything beyond my authority.
+Rate-limited `claude` tool for complex reasoning via Claude Code CLI. Exhaust local tools and free friends first — only use when genuinely needed. Budget is shown in the tool description.
 
 ### Session Commands
 

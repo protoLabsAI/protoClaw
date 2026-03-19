@@ -850,7 +850,12 @@ def _main():
     _vector_memory = VectorMemory()
     _agent.tools.register(_vector_memory.as_tool())
 
-    # Register Claude Code tool only if credentials exist
+    # Register Phone a Friend tool (multi-provider LLM fallback — always available)
+    from tools.phone_a_friend import PhoneAFriendTool
+
+    _agent.tools.register(PhoneAFriendTool())
+
+    # Register Claude Code CLI tool (rate-limited, only if credentials exist)
     from tools.claude import ClaudeTool, is_claude_available
 
     if is_claude_available():
