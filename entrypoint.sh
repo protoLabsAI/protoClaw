@@ -10,6 +10,15 @@ if [ -f /opt/claude-creds/.credentials.json ]; then
     mkdir -p /home/sandbox/.claude
     cp /opt/claude-creds/.credentials.json /home/sandbox/.claude/.credentials.json
     chmod 600 /home/sandbox/.claude/.credentials.json
+
+    # Export OAuth token as ANTHROPIC_API_KEY if not already set
+    # This lets summarize CLI, claude CLI, and other tools use it
+    if [ -z "$ANTHROPIC_API_KEY" ]; then
+        TOKEN=$(python3 -c "import json; d=json.load(open('/home/sandbox/.claude/.credentials.json')); print(d.get('claudeAiOauth',{}).get('accessToken',''))" 2>/dev/null)
+        if [ -n "$TOKEN" ]; then
+            export ANTHROPIC_API_KEY="$TOKEN"
+        fi
+    fi
 fi
 
 # Ensure persistent volume dirs exist with correct ownership
@@ -30,6 +39,10 @@ cp -r /opt/protoclaw/skills /sandbox/skills
 if [ ! -d /sandbox/.beads ]; then
     cd /sandbox && br init 2>/dev/null || true
 fi
+
+# Configure summarize CLI to use Anthropic by default
+mkdir -p /home/sandbox/.summarize
+echo '{"model": "anthropic/claude-sonnet-4-5-20250514"}' > /home/sandbox/.summarize/config.json
 
 # Start OpenCode web UI in background on port 7866
 opencode web --port 7866 --hostname 0.0.0.0 &

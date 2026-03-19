@@ -2,7 +2,7 @@ FROM python:3.12-slim
 
 # System deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    git curl ca-certificates build-essential \
+    git curl ca-certificates build-essential tmux \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root sandbox user (uid matches host user for bind mount perms)
@@ -25,6 +25,9 @@ RUN npm install -g agent-browser && agent-browser install --with-deps
 
 # Claude Code CLI (headless mode for AI-assisted tasks)
 RUN npm install -g @anthropic-ai/claude-code
+
+# Summarize CLI (URL/file/YouTube summarization — uses ANTHROPIC_API_KEY)
+RUN npm install -g @steipete/summarize
 
 # Beads issue tracker (pre-built binary)
 ARG BEADS_VERSION=0.1.29
