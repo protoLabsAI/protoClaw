@@ -21,6 +21,7 @@ RUN pip install --no-cache-dir /opt/nanobot/ gradio
 # Install protoClaw providers and server
 COPY providers/ /opt/protoclaw/providers/
 COPY scripts/install-providers.py /opt/protoclaw/
+COPY chat_ui.py /opt/protoclaw/chat_ui.py
 COPY server.py /opt/protoclaw/server.py
 COPY entrypoint.sh /opt/protoclaw/entrypoint.sh
 COPY config/ /opt/protoclaw/config/

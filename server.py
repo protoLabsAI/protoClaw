@@ -8,12 +8,11 @@ Usage:
 """
 
 import argparse
-import asyncio
 import re
 from pathlib import Path
 from typing import Any
 
-import gradio as gr
+from chat_ui import create_chat_app
 
 # ---------------------------------------------------------------------------
 # Agent setup
@@ -95,18 +94,17 @@ def _make_provider(config):
 
 
 # ---------------------------------------------------------------------------
-# Chat logic
+# Chat function
 # ---------------------------------------------------------------------------
 
 def _strip_think(text: str) -> str:
-    """Remove <think> blocks and orphaned </think> tags."""
     text = re.sub(r"<think>[\s\S]*?</think>", "", text)
     text = re.sub(r"</think>\s*", "", text)
     return text.strip()
 
 
-async def _chat(message: str, history: list[dict[str, str]], session_id: str) -> Any:
-    """Process a message through nanobot and yield incremental updates."""
+async def chat(message: str, session_id: str) -> list[dict[str, Any]]:
+    """Process a message through nanobot's agent loop."""
     progress_messages: list[dict] = []
 
     async def on_progress(content: str, *, tool_hint: bool = False) -> None:
@@ -135,77 +133,7 @@ async def _chat(message: str, history: list[dict[str, str]], session_id: str) ->
     )
 
     response = _strip_think(response or "")
-
-    messages = list(progress_messages)
-    messages.append({"role": "assistant", "content": response})
-    return messages
-
-
-def _sync_chat(message: str, history: list[dict], session_id: str):
-    """Sync wrapper — Gradio calls this, we run the async agent."""
-    return asyncio.run(_chat(message, history, session_id))
-
-
-# ---------------------------------------------------------------------------
-# Gradio UI
-# ---------------------------------------------------------------------------
-
-def create_app() -> gr.Blocks:
-    model_name = _config.agents.defaults.model if _config else "unknown"
-
-    with gr.Blocks(title="protoClaw") as app:
-        session_id = gr.State("default")
-
-        gr.Markdown(f"### 🦀 protoClaw\n<sub>`{model_name}` · sandboxed agent</sub>")
-
-        chatbot = gr.Chatbot(
-            height="80vh",
-            label="protoClaw",
-            show_label=False,
-        )
-
-        with gr.Row():
-            txt = gr.Textbox(
-                placeholder="Ask protoClaw anything...",
-                show_label=False,
-                scale=9,
-                container=False,
-            )
-            send_btn = gr.Button("Send", variant="primary", scale=1, min_width=80)
-
-        with gr.Row():
-            clear_btn = gr.Button("Clear", size="sm", variant="secondary")
-            new_session_btn = gr.Button("New Session", size="sm", variant="secondary")
-
-        # --- Callbacks ---
-
-        def respond(message: str, history: list[dict], sid: str):
-            if not message.strip():
-                return "", history
-            history.append({"role": "user", "content": message})
-            agent_messages = _sync_chat(message, history, sid)
-            history.extend(agent_messages)
-            return "", history
-
-        def clear_chat():
-            return [], "default"
-
-        def new_session():
-            import secrets
-            return [], secrets.token_hex(4)
-
-        submit_args = dict(
-            fn=respond,
-            inputs=[txt, chatbot, session_id],
-            outputs=[txt, chatbot],
-        )
-
-        txt.submit(**submit_args)
-        send_btn.click(**submit_args)
-        clear_btn.click(fn=clear_chat, outputs=[chatbot, session_id])
-        new_session_btn.click(fn=new_session, outputs=[chatbot, session_id])
-
-    return app
+    return [*progress_messages, {"role": "assistant", "content": response}]
 
 
 # ---------------------------------------------------------------------------
@@ -220,29 +148,18 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     _init_agent(args.config)
-    app = create_app()
+
+    model_name = _config.agents.defaults.model
+
+    app = create_chat_app(
+        chat_fn=chat,
+        title="🦀 protoClaw",
+        subtitle=f"`{model_name}` · sandboxed agent",
+        placeholder="Ask protoClaw anything...",
+    )
+
     app.launch(
         server_name="0.0.0.0",
         server_port=args.port,
         share=args.share,
-        theme=gr.themes.Soft(primary_hue="blue", neutral_hue="slate"),
-        css="""
-            footer { display: none !important; }
-            .built-with { display: none !important; }
-            button.copy-btn, button.like, button.dislike,
-            .message-buttons-left, .message-buttons-right,
-            .bot .message-buttons, .user .message-buttons,
-            .copy-button, .action-button,
-            [data-testid="copy-button"], [data-testid="like"], [data-testid="dislike"],
-            .message-wrap .icon-button, .message-wrap .icon-buttons,
-            .chatbot .icon-button, .chatbot .icon-buttons,
-            .chatbot .action-buttons,
-            .chatbot button[aria-label="Copy"], .chatbot button[aria-label="Like"],
-            .chatbot button[aria-label="Dislike"], .chatbot button[aria-label="Retry"],
-            .badge-wrap, .chatbot .badge-wrap,
-            span.chatbot-badge, .chatbot-badge,
-            .built-with-gradio, a[href*="gradio.app"] {
-                display: none !important;
-            }
-        """,
     )
