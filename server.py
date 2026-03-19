@@ -132,11 +132,10 @@ _HELP_TEXT = """\
 | `/model` | Show current model |
 | `/tools` | List registered tools |
 | `/audit [n]` | Show recent audit log entries |
-| `/mcp` | List connected MCP servers |
-| `/mcp add <name> <json>` | Add an MCP server at runtime |
-| `/mcp remove <name>` | Remove an MCP server |
 | `/beads [cmd]` | Quick beads issue tracker (list/ready/stats) |
 | `/help` | Show this help |
+
+MCP servers are managed in the **Settings** panel (right sidebar).
 """
 
 _THINK_LEVELS = {"low", "medium", "high", "off"}
@@ -497,6 +496,112 @@ async def chat(message: str, session_id: str) -> list[dict[str, Any]]:
 # Entrypoint
 # ---------------------------------------------------------------------------
 
+def _build_settings_callbacks() -> dict:
+    """Build callbacks for the settings sidebar."""
+
+    def get_mcp_config() -> str:
+        mcp_servers = _agent._mcp_servers or {}
+        serialized = {}
+        for name, cfg in mcp_servers.items():
+            entry = {}
+            if cfg.type:
+                entry["type"] = cfg.type
+            if cfg.command:
+                entry["command"] = cfg.command
+            if cfg.args:
+                entry["args"] = cfg.args
+            if cfg.env:
+                entry["env"] = cfg.env
+            if cfg.url:
+                entry["url"] = cfg.url
+            if cfg.headers:
+                entry["headers"] = cfg.headers
+            if cfg.tool_timeout != 30:
+                entry["toolTimeout"] = cfg.tool_timeout
+            if cfg.enabled_tools != ["*"]:
+                entry["enabledTools"] = cfg.enabled_tools
+            serialized[name] = entry
+        return json.dumps(serialized, indent=2)
+
+    def save_mcp_config(json_str: str) -> str:
+        try:
+            raw = json.loads(json_str)
+        except json.JSONDecodeError as e:
+            return f"**Error:** Invalid JSON — {e}"
+
+        if not isinstance(raw, dict):
+            return "**Error:** Config must be a JSON object."
+
+        from nanobot.config.schema import MCPServerConfig
+
+        # Unregister old MCP tools
+        if _agent._mcp_servers:
+            for name in list(_agent._mcp_servers.keys()):
+                prefix = f"mcp_{name}_"
+                for t in list(_agent.tools.tool_names):
+                    if t.startswith(prefix):
+                        _agent.tools.unregister(t)
+
+        # Parse and connect new servers
+        _agent._mcp_servers = {}
+        errors = []
+        for name, cfg_dict in raw.items():
+            try:
+                mcp_cfg = MCPServerConfig(**cfg_dict)
+                _agent._mcp_servers[name] = mcp_cfg
+            except Exception as e:
+                errors.append(f"`{name}`: {e}")
+
+        # Connect (async in sync context)
+        if _agent._mcp_servers:
+            from nanobot.agent.tools.mcp import connect_mcp_servers
+            try:
+                asyncio.run(connect_mcp_servers(
+                    _agent._mcp_servers, _agent.tools, _agent._mcp_stack
+                ))
+            except Exception as e:
+                errors.append(f"Connection error: {e}")
+
+        _persist_mcp_config()
+
+        if errors:
+            return "**Saved with errors:**\n" + "\n".join(f"- {e}" for e in errors)
+        return "**Saved.** MCP servers updated."
+
+    def get_mcp_status() -> str:
+        mcp_servers = _agent._mcp_servers or {}
+        if not mcp_servers:
+            return "No MCP servers configured."
+        lines = []
+        for name, cfg in mcp_servers.items():
+            stype = cfg.type or "auto"
+            prefix = f"mcp_{name}_"
+            tools = [t for t in _agent.tools.tool_names if t.startswith(prefix)]
+            if tools:
+                tool_list = ", ".join(f"`{t}`" for t in tools)
+                lines.append(f"**{name}** ({stype}) — connected\n  {tool_list}")
+            else:
+                lines.append(f"**{name}** ({stype}) — no tools connected")
+        return "\n\n".join(lines)
+
+    def get_tools_list() -> str:
+        names = sorted(_agent.tools.tool_names)
+        return "\n".join(f"- `{n}`" for n in names) or "No tools registered."
+
+    def get_model_info() -> str:
+        model = _agent.model or "unknown"
+        effort = getattr(_agent.provider.generation, "reasoning_effort", None) or "default"
+        return f"**Model:** `{model}`\n\n**Reasoning:** {effort}"
+
+    return {
+        "get_mcp_config": get_mcp_config,
+        "save_mcp_config": save_mcp_config,
+        "get_mcp_status": get_mcp_status,
+        "get_tools_list": get_tools_list,
+        "get_model_info": get_model_info,
+    }
+
+
 def _main():
     global _config_path
 
@@ -542,6 +647,7 @@ def _main():
         title="🦀 protoClaw",
         subtitle=f"`{model_name}` · sandboxed agent",
         placeholder="Ask protoClaw anything...",
+        settings=_build_settings_callbacks(),
     )
 
     app.launch(
