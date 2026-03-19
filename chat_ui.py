@@ -116,7 +116,7 @@ def create_chat_app(
 
             # --- Settings drawer ---
             if settings:
-                with gr.Sidebar(label="Settings", open=False):
+                with gr.Sidebar(label="Settings", open=False, position="right"):
 
                         with gr.Accordion("MCP Servers", open=False):
                             mcp_status = gr.Markdown("Loading...")
