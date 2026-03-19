@@ -11,7 +11,9 @@ import argparse
 import asyncio
 import contextvars
 import json
+import queue
 import re
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -444,9 +446,11 @@ def _strip_think(text: str) -> str:
     return text.strip()
 
 
+_SENTINEL = object()  # marks end of streaming
+
+
 async def chat(message: str, session_id: str) -> list[dict[str, Any]]:
-    """Process a message through nanobot's agent loop."""
-    # Handle slash commands before hitting the agent
+    """Process a message through nanobot's agent loop (non-streaming, for slash commands)."""
     stripped = message.strip()
     if stripped.startswith("/"):
         parts = stripped.split(None, 1)
@@ -455,24 +459,29 @@ async def chat(message: str, session_id: str) -> list[dict[str, Any]]:
         result = await _handle_command(cmd, args, session_id)
         if result is not None:
             return result
+    # Shouldn't reach here for normal messages (handled by chat_streaming)
+    return []
 
-    # Set session context for audit logging
+
+def chat_streaming(message: str, session_id: str, progress_queue: queue.Queue):
+    """Run agent loop in a thread, pushing progress messages to the queue."""
     token = _current_session_id.set(session_id)
-    try:
-        progress_messages: list[dict] = []
 
+    loop = asyncio.new_event_loop()
+
+    async def _run():
         async def on_progress(content: str, *, tool_hint: bool = False) -> None:
             content = _strip_think(content)
             if not content:
                 return
             if tool_hint:
-                progress_messages.append({
+                progress_queue.put({
                     "role": "assistant",
                     "metadata": {"title": f"🔧 {content}"},
                     "content": "",
                 })
             else:
-                progress_messages.append({
+                progress_queue.put({
                     "role": "assistant",
                     "metadata": {"title": "💭 Thinking"},
                     "content": content,
@@ -485,10 +494,17 @@ async def chat(message: str, session_id: str) -> list[dict[str, Any]]:
             chat_id=session_id,
             on_progress=on_progress,
         )
-
         response = _strip_think(response or "")
-        return [*progress_messages, {"role": "assistant", "content": response}]
+        progress_queue.put({"role": "assistant", "content": response})
+        progress_queue.put(_SENTINEL)
+
+    try:
+        loop.run_until_complete(_run())
+    except Exception as exc:
+        progress_queue.put({"role": "assistant", "content": f"Error: {exc}"})
+        progress_queue.put(_SENTINEL)
     finally:
+        loop.close()
         _current_session_id.reset(token)
 
 
@@ -730,6 +746,7 @@ def _main():
 
     app = create_chat_app(
         chat_fn=chat,
+        streaming_fn=chat_streaming,
         title="🦀 protoClaw",
         subtitle=f"`{_agent.model}`",
         placeholder="Ask protoClaw anything...",
