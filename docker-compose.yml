@@ -60,6 +60,10 @@ services:
       # Writes OAuth tokens to ~/.claude/.credentials.json in container
       - CLAUDE_OAUTH_CREDENTIALS=${CLAUDE_OAUTH_CREDENTIALS:-}
       - CLIPROXY_CALLBACK_HOST=${CLIPROXY_CALLBACK_HOST:-localhost}
+      # Langfuse tracing (optional — no-op if not set)
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY:-}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY:-}
+      - LANGFUSE_HOST=${LANGFUSE_HOST:-http://host.docker.internal:3001}
 
     stdin_open: true
     tty: true

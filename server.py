@@ -481,8 +481,9 @@ _current_session_id: contextvars.ContextVar[str] = contextvars.ContextVar(
 
 
 def _install_audit_wrapper():
-    """Monkey-patch _agent.tools.execute to log tool calls."""
+    """Monkey-patch _agent.tools.execute to log tool calls + Langfuse traces."""
     from audit import audit_logger
+    import tracing
 
     original_execute = _agent.tools.execute
 
@@ -493,15 +494,22 @@ def _install_audit_wrapper():
             result = await original_execute(name, params)
             duration_ms = int((time.monotonic() - t0) * 1000)
             success = not (isinstance(result, str) and result.startswith("Error"))
+            result_summary = result[:200] if isinstance(result, str) else str(result)[:200]
             audit_logger.log(
                 session_id=session_id,
                 tool=name,
                 args=params,
-                result_summary=result[:200]
-                if isinstance(result, str)
-                else str(result)[:200],
+                result_summary=result_summary,
                 duration_ms=duration_ms,
                 success=success,
+            )
+            tracing.trace_tool_call(
+                tool_name=name,
+                args=params,
+                result=result_summary,
+                duration_ms=duration_ms,
+                success=success,
+                session_id=session_id,
             )
             return result
         except Exception as exc:
@@ -513,6 +521,14 @@ def _install_audit_wrapper():
                 result_summary=str(exc)[:200],
                 duration_ms=duration_ms,
                 success=False,
+            )
+            tracing.trace_tool_call(
+                tool_name=name,
+                args=params,
+                result=str(exc)[:200],
+                duration_ms=duration_ms,
+                success=False,
+                session_id=session_id,
             )
             raise
 
@@ -542,8 +558,10 @@ async def chat(message: str, session_id: str) -> list[dict[str, Any]]:
         if result is not None:
             return result
 
-    # Set session context for audit logging
+    # Set session context for audit logging + tracing
+    import tracing
     token = _current_session_id.set(session_id)
+    tracing.start_trace(session_id=session_id, name="protoclaw-chat", metadata={"message_preview": message[:100]})
     try:
         progress_messages: list[dict] = []
 
@@ -579,6 +597,7 @@ async def chat(message: str, session_id: str) -> list[dict[str, Any]]:
         response = _strip_think(response or "")
         return [*progress_messages, {"role": "assistant", "content": response}]
     finally:
+        tracing.end_trace()
         _current_session_id.reset(token)
 
 
@@ -827,6 +846,10 @@ def _main():
 
     _init_agent(args.config)
 
+    # Initialize Langfuse tracing (no-op if env vars not set)
+    import tracing
+    tracing.init()
+
     # Track config path for /mcp persistence
     if args.config:
         _config_path = Path(args.config).expanduser().resolve()
@@ -921,7 +944,11 @@ def _main():
         )
 
     # Mount Gradio at root — PWA routes above take precedence
-    app = gr.mount_gradio_app(fastapi_app, blocks, path="/", footer_links=[])
+    app = gr.mount_gradio_app(
+        fastapi_app, blocks, path="/",
+        footer_links=[],
+        favicon_path=str(static_dir / "favicon.svg"),
+    )
 
     print(f"[protoClaw] Starting on http://0.0.0.0:{args.port}")
     uvicorn.run(app, host="0.0.0.0", port=args.port)
