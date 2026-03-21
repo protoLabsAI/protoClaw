@@ -1,9 +1,11 @@
 """Audit logging for protoClaw tool executions.
 
 Writes JSONL entries to /sandbox/audit/audit.jsonl with tool call metadata.
+Enhanced with Langfuse trace context for cross-referencing.
 """
 
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -15,6 +17,7 @@ class AuditLogger:
     def __init__(self, path: str | Path = "/sandbox/audit/audit.jsonl"):
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._session_stats: dict[str, dict] = {}
 
     def log(
         self,
@@ -26,6 +29,16 @@ class AuditLogger:
         duration_ms: int,
         success: bool,
     ) -> None:
+        # Get trace context if available
+        trace_id = None
+        try:
+            import tracing
+            trace = tracing._trace_ctx.get(None)
+            if trace:
+                trace_id = getattr(trace, "id", None)
+        except Exception:
+            pass
+
         entry = {
             "ts": datetime.now(timezone.utc).isoformat(),
             "session_id": session_id,
@@ -35,11 +48,24 @@ class AuditLogger:
             "duration_ms": duration_ms,
             "success": success,
         }
+        if trace_id:
+            entry["trace_id"] = trace_id
+
         try:
             with self.path.open("a") as f:
                 f.write(json.dumps(entry, default=str) + "\n")
         except OSError:
             pass  # Don't crash the agent if audit dir is unavailable
+
+        # Update session stats
+        stats = self._session_stats.setdefault(session_id, {
+            "tool_calls": 0, "successes": 0, "failures": 0, "total_ms": 0,
+            "tools_used": set(),
+        })
+        stats["tool_calls"] += 1
+        stats["successes" if success else "failures"] += 1
+        stats["total_ms"] += duration_ms
+        stats["tools_used"].add(tool)
 
     def get_recent(
         self, n: int = 20, session_id: str | None = None
@@ -67,6 +93,20 @@ class AuditLogger:
                 break
         entries.reverse()
         return entries
+
+    def get_session_stats(self, session_id: str) -> dict[str, Any]:
+        """Get aggregated stats for a session."""
+        stats = self._session_stats.get(session_id, {})
+        if not stats:
+            return {"tool_calls": 0}
+        return {
+            "tool_calls": stats["tool_calls"],
+            "successes": stats["successes"],
+            "failures": stats["failures"],
+            "total_ms": stats["total_ms"],
+            "avg_ms": stats["total_ms"] // max(stats["tool_calls"], 1),
+            "tools_used": sorted(stats.get("tools_used", set())),
+        }
 
 
 def _sanitize_args(args: dict[str, Any]) -> dict[str, Any]:

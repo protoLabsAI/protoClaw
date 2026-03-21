@@ -481,9 +481,10 @@ _current_session_id: contextvars.ContextVar[str] = contextvars.ContextVar(
 
 
 def _install_audit_wrapper():
-    """Monkey-patch _agent.tools.execute to log tool calls + Langfuse traces."""
+    """Monkey-patch _agent.tools.execute to log tool calls + Langfuse traces + metrics."""
     from audit import audit_logger
     import tracing
+    import metrics
 
     original_execute = _agent.tools.execute
 
@@ -511,6 +512,7 @@ def _install_audit_wrapper():
                 success=success,
                 session_id=session_id,
             )
+            metrics.record_tool_call(name, success, duration_ms / 1000)
             return result
         except Exception as exc:
             duration_ms = int((time.monotonic() - t0) * 1000)
@@ -530,6 +532,7 @@ def _install_audit_wrapper():
                 success=False,
                 session_id=session_id,
             )
+            metrics.record_tool_call(name, False, duration_ms / 1000)
             raise
 
     _agent.tools.execute = _audited_execute
@@ -846,9 +849,11 @@ def _main():
 
     _init_agent(args.config)
 
-    # Initialize Langfuse tracing (no-op if env vars not set)
+    # Initialize observability (no-op if deps/env vars not set)
     import tracing
+    import metrics
     tracing.init()
+    metrics.init()
 
     # Track config path for /mcp persistence
     if args.config:
@@ -912,6 +917,18 @@ def _main():
     static_dir = Path(__file__).parent / "static"
 
     fastapi_app = FastAPI(title="protoClaw — protoLabs")
+
+    # Prometheus /metrics endpoint
+    if metrics.is_enabled():
+        try:
+            from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+            from fastapi import Response as FastAPIResponse
+
+            @fastapi_app.get("/metrics", include_in_schema=False)
+            async def _prometheus_metrics():
+                return FastAPIResponse(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
+        except ImportError:
+            pass
 
     if static_dir.exists():
         # Serve PWA manifest at root path (required by browsers for installation)

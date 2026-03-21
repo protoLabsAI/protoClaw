@@ -49,7 +49,7 @@ RUN ARCH=$(dpkg --print-architecture) \
 
 # Install nanobot from submodule
 COPY nanobot/ /opt/nanobot/
-RUN pip install --no-cache-dir /opt/nanobot/ gradio sqlite-vec httpx uvicorn langfuse
+RUN pip install --no-cache-dir /opt/nanobot/ gradio sqlite-vec httpx uvicorn langfuse prometheus-client
 
 # Install protoClaw providers, tools, and server
 COPY providers/ /opt/protoclaw/providers/
@@ -60,6 +60,7 @@ COPY scripts/claude-login.sh /opt/protoclaw/scripts/claude-login.sh
 RUN chmod +x /opt/protoclaw/scripts/*.sh
 COPY audit.py /opt/protoclaw/audit.py
 COPY tracing.py /opt/protoclaw/tracing.py
+COPY metrics.py /opt/protoclaw/metrics.py
 COPY chat_ui.py /opt/protoclaw/chat_ui.py
 COPY server.py /opt/protoclaw/server.py
 COPY entrypoint.sh /opt/protoclaw/entrypoint.sh
